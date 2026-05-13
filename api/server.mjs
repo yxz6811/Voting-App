@@ -1,6 +1,6 @@
 /**
  * 班级作品集中存储 API：磁盘目录 + meta.json，供所有浏览器/账号共享列表。
- * 投票：`votes.json` 存 `voterStudentId → votedSubmissionId[]`（每人最多 10 票，不重复），原子写入。
+ * 投票：`votes.json` 存 `voterStudentId → votedSubmissionId[]`（每人最多 10 票，不重复），原子写入；读写投票接口须携带 `voterDisplayName` 并与允许名单一致。
  *
  * 环境变量：
  * - `VOTING_DATA_DIR`：数据根目录（默认 `./data`）
@@ -13,6 +13,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { fileURLToPath } from 'url'
+import { isAllowedLoginPair } from './loginRoster.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_ROOT = process.env.VOTING_DATA_DIR || path.join(__dirname, 'data')
@@ -219,8 +220,15 @@ app.get('/health', (_req, res) => {
 app.get('/votes/by-voter', async (req, res) => {
   try {
     const voterStudentId = String(req.query.voterStudentId ?? '').trim()
+    const voterDisplayName = String(req.query.voterDisplayName ?? '').trim()
     if (!voterStudentId) {
       return res.status(400).json({ error: 'missing_voter' })
+    }
+    if (!voterDisplayName) {
+      return res.status(400).json({ error: 'missing_voter_display_name' })
+    }
+    if (!isAllowedLoginPair(voterStudentId, voterDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
     }
     const map = await readVoteMap()
     let list = map[voterStudentId] ?? []
@@ -251,9 +259,16 @@ app.get('/votes/by-voter', async (req, res) => {
 app.put('/votes', async (req, res) => {
   try {
     const voterStudentId = String(req.body?.voterStudentId ?? '').trim()
+    const voterDisplayName = String(req.body?.voterDisplayName ?? '').trim()
     const votedSubmissionId = String(req.body?.votedSubmissionId ?? '').trim()
     if (!voterStudentId || !votedSubmissionId) {
       return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!voterDisplayName) {
+      return res.status(400).json({ error: 'missing_voter_display_name' })
+    }
+    if (!isAllowedLoginPair(voterStudentId, voterDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
     }
     if (!UUID_RE.test(votedSubmissionId)) {
       return res.status(400).json({ error: 'invalid_submission_id' })
@@ -264,9 +279,6 @@ app.put('/votes', async (req, res) => {
       meta = JSON.parse(await fs.readFile(path.join(base, 'meta.json'), 'utf8'))
     } catch {
       return res.status(404).json({ error: 'submission_not_found' })
-    }
-    if (String(meta.uploaderStudentId ?? '').trim() === voterStudentId) {
-      return res.status(403).json({ error: 'cannot_vote_own' })
     }
     const map = await readVoteMap()
     const cur = Array.isArray(map[voterStudentId])
@@ -291,9 +303,16 @@ app.put('/votes', async (req, res) => {
 app.delete('/votes', async (req, res) => {
   try {
     const voterStudentId = String(req.body?.voterStudentId ?? '').trim()
+    const voterDisplayName = String(req.body?.voterDisplayName ?? '').trim()
     const votedSubmissionId = String(req.body?.votedSubmissionId ?? '').trim()
     if (!voterStudentId || !votedSubmissionId) {
       return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!voterDisplayName) {
+      return res.status(400).json({ error: 'missing_voter_display_name' })
+    }
+    if (!isAllowedLoginPair(voterStudentId, voterDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
     }
     if (!UUID_RE.test(votedSubmissionId)) {
       return res.status(400).json({ error: 'invalid_submission_id' })

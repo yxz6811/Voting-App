@@ -6,6 +6,10 @@ import type { CurrentUser } from '../types/currentUser'
 export const ADMIN_DISPLAY_NAME = 'yxz'
 export const ADMIN_STUDENT_ID = '6811'
 
+/** 教师账号（与 `number.md` 管理员名单中 708 号一致），可登录查看与投票，非作品上传管理员 */
+export const TEACHER_DISPLAY_NAME = 'teacher'
+export const TEACHER_STUDENT_ID = '708'
+
 /**
  * 判断当前用户是否为班级作品上传管理员。
  *

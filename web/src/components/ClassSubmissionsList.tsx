@@ -82,7 +82,9 @@ interface SubmissionRowProps {
 }
 
 /**
- * 单条作品：元数据、预览入口、投票区。
+ * 单条作品：元数据、预览入口、与「预览」同行的投票区（含本人作品，仍受每人十票上限约束）。
+ *
+ * @param props - 行展示与交互
  */
 function SubmissionRow({
   row,
@@ -137,67 +139,50 @@ function SubmissionRow({
             <span className="submission-preview-unavailable">暂无可预览媒体</span>
           ) : null}
         </div>
-        {!isOwn ? (
-          <div className="submission-action-row__right">
-            {isVoted ? (
-              <>
-                <span className="vote-badge" aria-current="true">
-                  已投票
-                </span>
-                <button
-                  type="button"
-                  className="vote-cancel-btn"
-                  disabled={voteBusy}
-                  onClick={onCancelVote}
-                >
-                  取消
-                </button>
-              </>
-            ) : (
+        <div className="submission-action-row__right">
+          {isVoted ? (
+            <>
+              <span className="vote-badge" aria-current="true">
+                已投票
+              </span>
               <button
                 type="button"
-                className="vote-button"
+                className="vote-cancel-btn"
                 disabled={voteBusy}
-                onClick={onVote}
+                onClick={onCancelVote}
               >
-                投票
+                取消
               </button>
-            )}
-          </div>
-        ) : null}
+            </>
+          ) : (
+            <button
+              type="button"
+              className="vote-button"
+              disabled={voteBusy}
+              onClick={onVote}
+            >
+              投票
+            </button>
+          )}
+        </div>
       </div>
       <footer className="submission-vote-row">
-        {isOwn ? (
-          <div className="submission-own-row">
-            <span className="vote-own-label">本人作品，不参与投票</span>
-            {showAdminDelete ? (
-              <button
-                type="button"
-                className="submission-delete-btn"
-                onClick={onRequestDelete}
-              >
-                删除作品
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <>
-            <p className="submission-ux-tip">
-              {isVoted
-                ? '已支持该作品，可在排行榜关注名次变化。'
-                : '喜欢就投一票，票数会实时计入排行榜。'}
-            </p>
-            {showAdminDelete ? (
-              <button
-                type="button"
-                className="submission-delete-btn submission-delete-btn--admin-row"
-                onClick={onRequestDelete}
-              >
-                删除作品
-              </button>
-            ) : null}
-          </>
-        )}
+        <p className="submission-ux-tip">
+          {isVoted
+            ? '已支持该作品，可在排行榜关注名次变化。'
+            : isOwn
+              ? '也可为自己的作品投票，仍计入每人十票上限。'
+              : '喜欢就投一票，票数会实时计入排行榜。'}
+        </p>
+        {showAdminDelete ? (
+          <button
+            type="button"
+            className="submission-delete-btn submission-delete-btn--admin-row"
+            onClick={onRequestDelete}
+          >
+            删除作品
+          </button>
+        ) : null}
       </footer>
     </article>
   )
@@ -245,7 +230,10 @@ export function ClassSubmissionsList({
       let nextIds: string[] = []
       if (user != null) {
         try {
-          const srv = await fetchServerVotesForVoter(user.studentId)
+          const srv = await fetchServerVotesForVoter(
+            user.studentId,
+            user.displayName,
+          )
           const filtered = srv.filter((id) => ids.has(id))
           persistVotes(user.studentId, filtered)
           nextIds = filtered
@@ -268,14 +256,12 @@ export function ClassSubmissionsList({
     submissionsLoading,
     submissionsError,
     user?.studentId,
+    user?.displayName,
     refreshKey,
   ])
 
   function handleVoteClick(row: ClassSubmissionRecord) {
     if (user == null) {
-      return
-    }
-    if (row.uploaderStudentId === user.studentId) {
       return
     }
     if (votedSubmissionIds.includes(row.submissionId)) {
@@ -292,7 +278,7 @@ export function ClassSubmissionsList({
     void (async () => {
       setVoteSubmitting(true)
       try {
-        await castServerVote(user.studentId, row.submissionId)
+        await castServerVote(user.studentId, user.displayName, row.submissionId)
         const next = [...votedSubmissionIds, row.submissionId]
         persistVotes(user.studentId, next)
         setVotedSubmissionIds(next)
@@ -326,7 +312,7 @@ export function ClassSubmissionsList({
     void (async () => {
       setVoteSubmitting(true)
       try {
-        await withdrawServerVote(user.studentId, row.submissionId)
+        await withdrawServerVote(user.studentId, user.displayName, row.submissionId)
         const next = votedSubmissionIds.filter((id) => id !== row.submissionId)
         persistVotes(user.studentId, next)
         setVotedSubmissionIds(next)

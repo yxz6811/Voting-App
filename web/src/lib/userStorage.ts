@@ -1,4 +1,5 @@
 import type { CurrentUser } from '../types/currentUser'
+import { isAllowedLoginPair } from './loginRoster'
 import { validateDisplayName, validateStudentId } from './validateUser'
 
 /** localStorage 键名（版本化，便于日后迁移） */
@@ -34,6 +35,10 @@ export function readStoredUser(): CurrentUser | null {
     const nameResult = validateDisplayName(displayName)
     const idResult = validateStudentId(studentId)
     if (!nameResult.ok || !idResult.ok) {
+      return null
+    }
+    if (!isAllowedLoginPair(idResult.value, nameResult.value)) {
+      clearStoredUser()
       return null
     }
     return {
