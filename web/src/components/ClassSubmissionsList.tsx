@@ -123,17 +123,47 @@ function SubmissionRow({
           </span>
         </span>
       </header>
-      <div className="submission-preview-slot">
-        <button
-          type="button"
-          className="ux-action-btn ux-action-btn--primary"
-          disabled={!canPreview}
-          onClick={onPreview}
-        >
-          预览
-        </button>
-        {!canPreview ? (
-          <span className="submission-preview-unavailable">暂无可预览媒体</span>
+      <div className="submission-action-row">
+        <div className="submission-action-row__left">
+          <button
+            type="button"
+            className="ux-action-btn ux-action-btn--primary"
+            disabled={!canPreview}
+            onClick={onPreview}
+          >
+            预览
+          </button>
+          {!canPreview ? (
+            <span className="submission-preview-unavailable">暂无可预览媒体</span>
+          ) : null}
+        </div>
+        {!isOwn ? (
+          <div className="submission-action-row__right">
+            {isVoted ? (
+              <>
+                <span className="vote-badge" aria-current="true">
+                  已投票
+                </span>
+                <button
+                  type="button"
+                  className="vote-cancel-btn"
+                  disabled={voteBusy}
+                  onClick={onCancelVote}
+                >
+                  取消
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="vote-button"
+                disabled={voteBusy}
+                onClick={onVote}
+              >
+                投票
+              </button>
+            )}
+          </div>
         ) : null}
       </div>
       <footer className="submission-vote-row">
@@ -152,32 +182,6 @@ function SubmissionRow({
           </div>
         ) : (
           <>
-            <div className="submission-vote-actions">
-              {isVoted ? (
-                <>
-                  <span className="vote-badge" aria-current="true">
-                    已投票
-                  </span>
-                  <button
-                    type="button"
-                    className="vote-cancel-btn"
-                    disabled={voteBusy}
-                    onClick={onCancelVote}
-                  >
-                    取消
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="vote-button"
-                  disabled={voteBusy}
-                  onClick={onVote}
-                >
-                  投票
-                </button>
-              )}
-            </div>
             <p className="submission-ux-tip">
               {isVoted
                 ? '已支持该作品，可在排行榜关注名次变化。'

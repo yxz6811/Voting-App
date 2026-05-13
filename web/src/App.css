@@ -545,12 +545,30 @@
   font-size: 0.9rem;
 }
 
-.submission-preview-slot {
+.submission-action-row {
   margin-top: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.submission-action-row__left {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.submission-action-row__right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-left: auto;
 }
 
 .submission-preview-unavailable {
@@ -690,12 +708,6 @@
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-.submission-vote-actions {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
 }
 
 .submission-ux-tip {
