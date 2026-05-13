@@ -62,10 +62,10 @@ export function LoginForm() {
         </form>
       </div>
       <aside className="auth-glance" aria-hidden="true">
-        <p className="auth-glance-title">今天做什么</p>
+        <p className="auth-glance-title">如何完成投票？</p>
         <ol className="auth-glance-list">
           <li>浏览班级作品</li>
-          <li>支持你喜欢的同学</li>
+          <li>为你喜欢的作品投上一票</li>
           <li>关注实时排行榜</li>
         </ol>
       </aside>
