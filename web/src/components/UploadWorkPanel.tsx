@@ -11,7 +11,7 @@ interface UploadWorkPanelProps {
 }
 
 /**
- * 上传作品：选择文件、校验、写入 IndexedDB。
+ * 上传作品：选择文件、校验后提交到班级作品服务器。
  */
 export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
   const { user } = useAuth()
