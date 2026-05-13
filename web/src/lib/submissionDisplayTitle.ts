@@ -27,7 +27,7 @@ export function validateSubmissionDisplayTitle(
 }
 
 /**
- * 列表/弹窗中用于展示的作品标题：优先 `displayTitle`，否则回退为原始文件名。
+ * 列表/弹窗中用于展示的作品标题：优先 `displayTitle`；无媒体且未填作品名时为「/」；否则回退为原始文件名。
  *
  * @param row 班级作品记录
  */
@@ -35,6 +35,13 @@ export function submissionDisplayLabel(row: ClassSubmissionRecord): string {
   const t = row.displayTitle?.trim()
   if (t != null && t.length > 0) {
     return t
+  }
+  const noMedia =
+    row.hasMedia === false ||
+    row.byteSize === 0 ||
+    row.originalFileName === '(无媒体)'
+  if (noMedia) {
+    return '/'
   }
   return row.originalFileName
 }

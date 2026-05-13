@@ -523,7 +523,7 @@
 
 .classroom-list-with-leaderboard {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
   gap: 1rem;
   align-items: start;
 }
@@ -943,8 +943,8 @@
 
 .vote-leaderboard-row-inner {
   display: grid;
-  grid-template-columns: 2.75rem minmax(0, 0.9fr) minmax(0, 1.1fr) auto;
-  gap: 0.32rem 0.4rem;
+  grid-template-columns: 2.75rem minmax(0, 1.62fr) minmax(0, 0.55fr) auto;
+  gap: 0.32rem 0.45rem;
   align-items: center;
   font-size: 0.88rem;
 }
@@ -1019,12 +1019,25 @@
   fill: #27170b;
 }
 
-.vote-leaderboard-cell--author,
+.vote-leaderboard-cell--author {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.38;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
 .vote-leaderboard-cell--title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 0.55rem;
 }
 
 .vote-leaderboard-cell--votes {

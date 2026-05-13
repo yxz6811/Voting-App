@@ -41,7 +41,7 @@ const LOGIN_ROSTER_BY_STUDENT_ID = Object.freeze({
   '13': '刘嘉乐',
   '14': '陆佳涛',
   '15': '陆艺桐',
-  '16': '洛辰娜',
+  '16': '骆辰娜',
   '17': '马铭阳',
   '18': '毛高默',
   '19': '倪嘉言',
@@ -637,7 +637,8 @@ app.post('/submissions/text', async (req, res) => {
       displayTitle = '未命名作品'
       authorDisplayName = '未署名'
     } else if (!displayTitle) {
-      displayTitle = authorDisplayName
+      /** 仅填作者名时作品名留空，由前端在无媒体条目上展示为「/」 */
+      displayTitle = ''
     } else if (!authorDisplayName) {
       authorDisplayName = displayTitle
     }

@@ -19,7 +19,7 @@ export const LOGIN_ROSTER_BY_STUDENT_ID: Readonly<Record<string, string>> =
     '13': '刘嘉乐',
     '14': '陆佳涛',
     '15': '陆艺桐',
-    '16': '洛辰娜',
+    '16': '骆辰娜',
     '17': '马铭阳',
     '18': '毛高默',
     '19': '倪嘉言',

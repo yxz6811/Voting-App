@@ -64,6 +64,7 @@ function LeaderboardRankOrCrown({ rank }: { rank: number }) {
 
 /**
  * 票数排行榜：按得票降序列出全部作品（侧栏）。
+ * 作者名过长时由样式折为至多两行；皇冠、作品名与票数列与该行垂直居中对齐。
  */
 export function VoteLeaderboardPanel({
   rows,
