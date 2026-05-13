@@ -3,6 +3,7 @@ import type { ClassSubmissionRecord } from '../types/classSubmission'
 import { listSubmissionsDesc } from '../lib/submissionsDb'
 import { VOTES_PER_USER } from '../lib/voteStorage'
 import { ClassSubmissionsList } from './ClassSubmissionsList'
+import { SubmissionPreviewPage } from './SubmissionPreviewPage'
 import { UploadWorkPanel } from './UploadWorkPanel'
 import { VoteLeaderboardPanel } from './VoteLeaderboardPanel'
 import { useAuth } from '../auth'
@@ -17,6 +18,7 @@ export function LoggedInClassroom() {
   const { user } = useAuth()
   const isAdmin = isClassSubmissionAdmin(user)
   const [tab, setTab] = useState<ClassroomTab>('list')
+  const [previewSubmissionId, setPreviewSubmissionId] = useState<string | null>(null)
   const [listRefreshKey, setListRefreshKey] = useState(0)
   const [listRows, setListRows] = useState<ClassSubmissionRecord[]>([])
   const [listLoading, setListLoading] = useState(false)
@@ -62,6 +64,21 @@ export function LoggedInClassroom() {
       setTab('list')
     }
   }, [isAdmin, tab])
+
+  const previewRow =
+    previewSubmissionId == null
+      ? undefined
+      : listRows.find((r) => r.submissionId === previewSubmissionId)
+
+  useEffect(() => {
+    if (previewSubmissionId == null || listLoading) {
+      return
+    }
+    const exists = listRows.some((r) => r.submissionId === previewSubmissionId)
+    if (tab !== 'list' || !exists) {
+      setPreviewSubmissionId(null)
+    }
+  }, [previewSubmissionId, listRows, tab, listLoading])
 
   function goListTab() {
     setListLoading(true)
@@ -118,12 +135,31 @@ export function LoggedInClassroom() {
               }}
             />
           </div>
+        ) : previewSubmissionId != null ? (
+          previewRow != null ? (
+            <SubmissionPreviewPage
+              row={previewRow}
+              onBack={() => setPreviewSubmissionId(null)}
+            />
+          ) : (
+            <div className="submission-preview-missing classroom-pane">
+              <p className="panel-empty">该作品已不存在或已被删除。</p>
+              <button
+                type="button"
+                className="ux-action-btn ux-action-btn--primary"
+                onClick={() => setPreviewSubmissionId(null)}
+              >
+                返回列表
+              </button>
+            </div>
+          )
         ) : (
           <div className="classroom-list-with-leaderboard">
             <div className="classroom-list-main classroom-pane">
               <ClassSubmissionsList
                 refreshKey={listRefreshKey}
                 onListMutated={bumpList}
+                onOpenPreview={(id) => setPreviewSubmissionId(id)}
                 submissions={listRows}
                 submissionsLoading={listLoading}
                 submissionsError={listError}
