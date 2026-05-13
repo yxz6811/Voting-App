@@ -46,7 +46,7 @@ export function LoginForm() {
             autoComplete="username"
             value={studentId}
             onChange={(ev) => setStudentId(ev.target.value)}
-            placeholder="4–20 位字母或数字"
+            placeholder="如 1–50 或字母数字组合，最多 20 位"
           />
         </label>
         <button type="submit" className="auth-submit">

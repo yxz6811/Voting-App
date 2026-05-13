@@ -1,4 +1,5 @@
-const STUDENT_ID_PATTERN = /^[0-9A-Za-z]{4,20}$/
+/** 学号：1–20 位字母或数字（兼容如 1–50 的短数字学号） */
+const STUDENT_ID_PATTERN = /^[0-9A-Za-z]{1,20}$/
 
 /**
  * 计算字符串的 Unicode 码点数量（与 OpenSpec 中「≤32 码点」一致）。
@@ -32,7 +33,7 @@ export function validateDisplayName(
 }
 
 /**
- * 校验学号：trim 后须匹配 `^[0-9A-Za-z]{4,20}$`。
+ * 校验学号：trim 后须匹配 `^[0-9A-Za-z]{1,20}$`。
  *
  * @param raw 用户输入
  * @returns 成功时返回 trim 后的学号；失败时返回错误文案
@@ -49,7 +50,7 @@ export function validateStudentId(
   if (!STUDENT_ID_PATTERN.test(value)) {
     return {
       ok: false,
-      message: '学号须为 4–20 位字母或数字',
+      message: '学号须为 1–20 位字母或数字',
     }
   }
   return { ok: true, value }
