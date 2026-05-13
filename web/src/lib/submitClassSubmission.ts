@@ -1,14 +1,31 @@
 import type { CurrentUser } from '../types/currentUser'
-import type { ClassSubmissionRecord } from '../types/classSubmission'
 import { classifySubmissionFile } from './mediaValidation'
-import { addSubmission } from './submissionsDb'
+import { getSubmissionsApiBase } from './submissionsApiBase'
 
 export type SubmitClassSubmissionResult =
   | { ok: true }
   | { ok: false; message: string }
 
+function mapUploadError(status: number, body: string): string {
+  try {
+    const j = JSON.parse(body) as { error?: string }
+    if (j.error === 'file_too_large') {
+      return '文件过大，服务器拒绝保存。'
+    }
+    if (j.error === 'missing_file' || j.error === 'missing_fields') {
+      return '提交数据不完整，请重试。'
+    }
+  } catch {
+    /* ignore */
+  }
+  if (status === 413) {
+    return '文件过大，服务器拒绝保存。'
+  }
+  return '作品保存失败，请稍后重试。'
+}
+
 /**
- * 将本地文件保存为一条班级作品提交（需已登录）。
+ * 将本地文件上传到班级作品服务器（全班共享列表）。
  *
  * @param user 当前用户；未登录时固定失败
  * @param file 用户选择的文件
@@ -26,33 +43,27 @@ export async function submitClassSubmission(
     return { ok: false, message: classified.message }
   }
 
-  const row: ClassSubmissionRecord = {
-    submissionId: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    uploaderDisplayName: user.displayName,
-    uploaderStudentId: user.studentId,
-    mimeType: classified.effectiveMime,
-    originalFileName: file.name,
-    byteSize: file.size,
-    mediaKind: classified.mediaKind,
-    blob: file,
-  }
+  const base = getSubmissionsApiBase()
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('uploaderDisplayName', user.displayName)
+  fd.append('uploaderStudentId', user.studentId)
+  fd.append('mediaKind', classified.mediaKind)
 
   try {
-    await addSubmission(row)
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      return {
-        ok: false,
-        message:
-          '浏览器存储空间不足，请删除部分作品或清理站点数据后重试。',
-      }
+    const res = await fetch(`${base}/submissions`, {
+      method: 'POST',
+      body: fd,
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      return { ok: false, message: mapUploadError(res.status, text) }
     }
+    return { ok: true }
+  } catch {
     return {
       ok: false,
-      message: '作品保存失败，请稍后重试。',
+      message: '无法连接作品服务器，请检查网络或稍后再试。',
     }
   }
-
-  return { ok: true }
 }

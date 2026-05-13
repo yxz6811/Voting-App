@@ -4,7 +4,7 @@
 export type SubmissionMediaKind = 'image' | 'video'
 
 /**
- * 持久化在 IndexedDB 中的一条班级作品提交（含二进制）。
+ * 一条班级作品：元数据 + 媒体来源（服务端 URL 或本地 Blob，二选一）。
  */
 export interface ClassSubmissionRecord {
   /** 唯一提交 ID */
@@ -23,6 +23,8 @@ export interface ClassSubmissionRecord {
   byteSize: number
   /** 图片或视频 */
   mediaKind: SubmissionMediaKind
-  /** 作品二进制 */
-  blob: Blob
+  /** 本地 Blob（仅旧版 IndexedDB；当前以服务端为主） */
+  blob?: Blob
+  /** 同源媒体地址（服务端列表） */
+  mediaUrl?: string
 }

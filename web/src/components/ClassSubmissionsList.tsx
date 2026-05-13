@@ -124,9 +124,15 @@ export function ClassSubmissionsList({ refreshKey }: ClassSubmissionsListProps) 
           nextActive = reconcileVoteWithSubmissions(ids, user.studentId)
         }
         const next = rows.map((row) => {
-          const url = URL.createObjectURL(row.blob)
-          revokeList.push(url)
-          return { row, url }
+          if (row.mediaUrl != null && row.mediaUrl !== '') {
+            return { row, url: row.mediaUrl }
+          }
+          if (row.blob != null) {
+            const url = URL.createObjectURL(row.blob)
+            revokeList.push(url)
+            return { row, url }
+          }
+          return { row, url: '' }
         })
         setItems(next)
         setActiveVoteId(nextActive)
