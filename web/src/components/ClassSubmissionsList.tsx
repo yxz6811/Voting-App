@@ -14,6 +14,7 @@ import {
   persistVote,
   reconcileVoteWithSubmissions,
 } from '../lib/voteStorage'
+import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
 import { VoteChangeModal } from './VoteChangeModal'
 import { DeleteSubmissionModal } from './DeleteSubmissionModal'
 
@@ -55,13 +56,14 @@ function SubmissionRow({
   const [mediaFailed, setMediaFailed] = useState(false)
   const cardClass =
     'submission-card' + (isVoted ? ' submission-card--voted' : '')
+  const titleShown = submissionDisplayLabel(row)
 
   return (
     <article className={cardClass}>
       <header className="submission-card-head">
         <span className="submission-author">{row.uploaderDisplayName}</span>
         <span className="submission-meta">
-          {mediaKindLabel(row.mediaKind)} · {row.originalFileName}
+          {mediaKindLabel(row.mediaKind)} · {titleShown}
           <span className="submission-vote-count" aria-label={`得票 ${row.voteCount} 票`}>
             {' '}
             · {row.voteCount} 票
@@ -78,7 +80,7 @@ function SubmissionRow({
         ) : row.mediaKind === 'image' ? (
           <img
             src={previewUrl}
-            alt={row.originalFileName}
+            alt={titleShown}
             loading="lazy"
             onError={() => setMediaFailed(true)}
           />

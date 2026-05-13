@@ -19,6 +19,8 @@ export interface ClassSubmissionRecord {
   mimeType: string
   /** 原始文件名 */
   originalFileName: string
+  /** 用户填写的作品展示名（新提交必有；旧数据可无） */
+  displayTitle?: string
   /** 字节大小 */
   byteSize: number
   /** 图片或视频 */

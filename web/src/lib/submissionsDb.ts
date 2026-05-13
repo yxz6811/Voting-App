@@ -10,6 +10,7 @@ interface SubmissionMetaJson {
   originalFileName: string
   byteSize: number
   mediaKind: 'image' | 'video'
+  displayTitle?: string
   voteCount?: number
 }
 
@@ -32,6 +33,10 @@ export async function listSubmissionsDesc(): Promise<ClassSubmissionRecord[]> {
     uploaderStudentId: m.uploaderStudentId,
     mimeType: m.mimeType,
     originalFileName: m.originalFileName,
+    displayTitle:
+      typeof m.displayTitle === 'string' && m.displayTitle.trim() !== ''
+        ? m.displayTitle.trim()
+        : undefined,
     byteSize: m.byteSize,
     mediaKind: m.mediaKind,
     mediaUrl: `${base}/submissions/${m.submissionId}/media`,

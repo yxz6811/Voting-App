@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ClassSubmissionRecord } from '../types/classSubmission'
+import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
 
 interface VoteChangeModalProps {
   target: ClassSubmissionRecord
@@ -49,7 +50,7 @@ export function VoteChangeModal({
         </h2>
         <p className="vote-modal-body">
           您已投票给其他作品。若继续，将<strong>取消原先的投票</strong>
-          ，并改投给「{target.uploaderDisplayName}」的这件作品。是否确认？
+          ，并改投给「{target.uploaderDisplayName}」的作品「{submissionDisplayLabel(target)}」。是否确认？
         </p>
         <div className="vote-modal-actions">
           <button

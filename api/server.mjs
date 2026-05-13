@@ -246,6 +246,8 @@ app.get('/submissions', async (_req, res) => {
   }
 })
 
+const MAX_DISPLAY_TITLE_LEN = 80
+
 app.post('/submissions', upload.single('file'), async (req, res) => {
   const id = req._submissionId
   try {
@@ -257,16 +259,22 @@ app.post('/submissions', upload.single('file'), async (req, res) => {
     }
     const uploaderDisplayName = String(req.body.uploaderDisplayName ?? '').trim()
     const uploaderStudentId = String(req.body.uploaderStudentId ?? '').trim()
+    const displayTitle = String(req.body.displayTitle ?? '').trim()
     const mediaKind = req.body.mediaKind === 'video' ? 'video' : 'image'
-    if (!uploaderDisplayName || !uploaderStudentId) {
+    if (!uploaderDisplayName || !uploaderStudentId || !displayTitle) {
       await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
       return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (displayTitle.length > MAX_DISPLAY_TITLE_LEN) {
+      await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
+      return res.status(400).json({ error: 'display_title_too_long' })
     }
     const meta = {
       submissionId: id,
       createdAt: new Date().toISOString(),
       uploaderDisplayName,
       uploaderStudentId,
+      displayTitle,
       mimeType: req.file.mimetype || 'application/octet-stream',
       originalFileName: req.file.originalname || 'upload',
       byteSize: req.file.size,

@@ -196,6 +196,12 @@
   border: 0;
 }
 
+.upload-title-field {
+  width: 100%;
+  max-width: 28rem;
+  align-self: stretch;
+}
+
 .panel-error {
   padding: 0.65rem 0.75rem;
   border-radius: 8px;

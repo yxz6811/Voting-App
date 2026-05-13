@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ClassSubmissionRecord } from '../types/classSubmission'
+import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
 
 interface DeleteSubmissionModalProps {
   target: ClassSubmissionRecord
@@ -48,7 +49,9 @@ export function DeleteSubmissionModal({
           删除作品
         </h2>
         <p className="vote-modal-body">
-          确定要删除「{target.uploaderDisplayName}」的「{target.originalFileName}」吗？此操作不可恢复；若其他同学曾投票给该作品，相关选票将失效。
+          {`确定要删除「${target.uploaderDisplayName}」的「${submissionDisplayLabel(
+            target,
+          )}」吗？此操作不可恢复；若其他同学曾投票给该作品，相关选票将失效。`}
         </p>
         <div className="vote-modal-actions">
           <button
