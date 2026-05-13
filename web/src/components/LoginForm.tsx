@@ -25,7 +25,9 @@ export function LoginForm() {
         <p className="auth-kicker">Class Vote Studio</p>
         <h1 className="auth-title">班级作品投票</h1>
         <p className="auth-sub">
-          请输入名单中的姓名与学号（须完全一致）；本班无 38 号。管理员 6811 / 教师 708 账号见通知。
+          请输入名单中的姓名与学号
+          <br />
+          （须完全一致）
         </p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {error != null ? (
@@ -51,7 +53,7 @@ export function LoginForm() {
               autoComplete="username"
               value={studentId}
               onChange={(ev) => setStudentId(ev.target.value)}
-              placeholder="如 7、39、6811、708"
+              placeholder="如 7、39"
             />
           </label>
           <button type="submit" className="auth-submit">
