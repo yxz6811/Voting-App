@@ -55,7 +55,10 @@ export async function submitFeedback(payload: SubmitFeedbackPayload): Promise<vo
  */
 function mapFeedbackErrorMessage(status: number, errorCode: string): string {
   if (errorCode === 'feedback_smtp_not_configured') {
-    return '反馈功能尚未在服务器上配置发信，请联系管理员。'
+    return '反馈功能尚未在服务器上配置发信（缺少 SMTP 授权码等），请联系管理员。'
+  }
+  if (errorCode === 'feedback_nodemailer_missing') {
+    return '发信组件未安装：请在服务器 API 目录执行 npm install 后重启投票服务。'
   }
   if (errorCode === 'feedback_rate_limited') {
     return '提交过于频繁，请稍后再试。'
@@ -75,8 +78,11 @@ function mapFeedbackErrorMessage(status: number, errorCode: string): string {
   if (errorCode === 'feedback_send_failed') {
     return '邮件发送失败，请稍后重试或联系管理员。'
   }
+  if (errorCode === 'http_502' || errorCode === 'http_503' || errorCode === 'http_504') {
+    return '暂时连不上投票服务，请稍后刷新；若持续出现请联系管理员检查 API 是否已启动。'
+  }
   if (status >= 500) {
-    return '服务器繁忙，请稍后重试。'
+    return '服务器返回错误，请稍后重试；若列表也无法加载，多半是 API 进程未启动或未安装依赖。'
   }
   return '提交失败，请稍后重试。'
 }

@@ -22,7 +22,7 @@ cd web && npm run build && rsync -avz --delete -e "ssh -p 41326" ./dist/ root@19
 
 API 由 Nginx 反代 `/voting-app-api/`，改 `api/server.mjs` 时需在服务器上单独更新 Node 进程与数据目录，**不要**改其他站点的 Nginx 配置。
 
-首次拉取含「反馈发信」的代码后，在服务器 API 目录执行一次 **`npm install`**（会安装 `nodemailer`）。反馈邮件依赖环境变量（**不要把 QQ 邮箱 SMTP 授权码写进仓库或前端**，只在服务器上配置）：
+首次拉取含「反馈发信」的代码后，在服务器 API 目录执行一次 **`npm install`**（会安装 `nodemailer`）。**若未安装，旧版会因顶层 `import nodemailer` 导致整条 API 无法启动（班级列表也会红）；当前版本已改为按需动态加载，未安装时仅「反馈发信」不可用，列表与投票仍正常。**
 
 - **`VOTING_FEEDBACK_SMTP_PASS`**（必填）：QQ 邮箱设置里生成的 SMTP 授权码。
 - **`VOTING_FEEDBACK_TO_EMAIL`**（可选）：收件邮箱，默认 `3978401510@qq.com`。

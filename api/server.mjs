@@ -10,7 +10,6 @@
 import cors from 'cors'
 import express from 'express'
 import multer from 'multer'
-import nodemailer from 'nodemailer'
 import fs from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -286,8 +285,10 @@ app.set('trust proxy', 1)
 app.use(cors())
 app.use(express.json({ limit: '1mb' }))
 
-/** @type {import('nodemailer').Transporter | null} */
+/** @type {unknown} */
 let feedbackTransporter = null
+/** 若 `import('nodemailer')` 已失败，本进程内不再重试（部署修复后需重启服务）。 */
+let feedbackNodemailerImportFailed = false
 
 const FEEDBACK_DEFAULT_TO = '3978401510@qq.com'
 const FEEDBACK_RATELIMIT_WINDOW_MS = 60 * 60 * 1000
@@ -314,15 +315,30 @@ function feedbackRateAllow(ip) {
 }
 
 /**
- * @returns {import('nodemailer').Transporter | null}
+ * 懒加载 nodemailer 并创建发信 transport；未配置密码、依赖缺失或加载失败时返回 `null`。
+ * 使用动态 import，避免线上未执行 `npm install` 时整条 API 进程无法启动（列表、投票等仍可用）。
+ *
+ * @returns {Promise<unknown | null>}
  */
-function getFeedbackTransporter() {
+async function getFeedbackTransporter() {
+  if (feedbackNodemailerImportFailed) {
+    return null
+  }
   const pass = String(process.env.VOTING_FEEDBACK_SMTP_PASS ?? '').trim()
   if (!pass) {
     return null
   }
   if (feedbackTransporter) {
     return feedbackTransporter
+  }
+  let nodemailer
+  try {
+    const mod = await import('nodemailer')
+    nodemailer = mod.default
+  } catch (e) {
+    console.error('nodemailer import failed (run npm install in API directory)', e)
+    feedbackNodemailerImportFailed = true
+    return null
   }
   const toDefault = (process.env.VOTING_FEEDBACK_TO_EMAIL || FEEDBACK_DEFAULT_TO).trim()
   const user = String(
@@ -362,9 +378,6 @@ app.get('/health', (_req, res) => {
 app.post('/feedback', async (req, res) => {
   try {
     const ip = clientIp(req)
-    if (!feedbackRateAllow(ip)) {
-      return res.status(429).json({ error: 'feedback_rate_limited' })
-    }
     const userStudentId = String(req.body?.userStudentId ?? '').trim()
     const userDisplayName = String(req.body?.userDisplayName ?? '').trim()
     const message = String(req.body?.message ?? '').trim()
@@ -381,9 +394,16 @@ app.post('/feedback', async (req, res) => {
     if (contact.length > 200) {
       return res.status(400).json({ error: 'contact_too_long' })
     }
-    const transport = getFeedbackTransporter()
+    if (!feedbackRateAllow(ip)) {
+      return res.status(429).json({ error: 'feedback_rate_limited' })
+    }
+    const transport = await getFeedbackTransporter()
     if (!transport) {
-      return res.status(503).json({ error: 'feedback_smtp_not_configured' })
+      return res.status(503).json({
+        error: feedbackNodemailerImportFailed
+          ? 'feedback_nodemailer_missing'
+          : 'feedback_smtp_not_configured',
+      })
     }
     const to = (process.env.VOTING_FEEDBACK_TO_EMAIL || FEEDBACK_DEFAULT_TO).trim()
     const fromAddr = String(
@@ -594,6 +614,67 @@ function isAdminUploader(displayName, studentId) {
   )
 }
 
+/**
+ * 无媒体登记：仅写入 `meta.json`（投票用，可不传图片/视频）。
+ */
+app.post('/submissions/text', async (req, res) => {
+  try {
+    const operatorDisplayName = String(
+      req.body?.operatorDisplayName ?? req.body?.uploaderDisplayName ?? '',
+    ).trim()
+    const operatorStudentId = String(
+      req.body?.operatorStudentId ?? req.body?.uploaderStudentId ?? '',
+    ).trim()
+    let displayTitle = String(req.body?.displayTitle ?? '').trim()
+    let authorDisplayName = String(req.body?.authorDisplayName ?? '').trim()
+    if (!operatorDisplayName || !operatorStudentId) {
+      return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!isAdminUploader(operatorDisplayName, operatorStudentId)) {
+      return res.status(403).json({ error: 'upload_forbidden' })
+    }
+    if (!displayTitle && !authorDisplayName) {
+      displayTitle = '未命名作品'
+      authorDisplayName = '未署名'
+    } else if (!displayTitle) {
+      displayTitle = authorDisplayName
+    } else if (!authorDisplayName) {
+      authorDisplayName = displayTitle
+    }
+    if (displayTitle.length > MAX_DISPLAY_TITLE_LEN) {
+      return res.status(400).json({ error: 'display_title_too_long' })
+    }
+    if (authorDisplayName.length > MAX_AUTHOR_DISPLAY_LEN) {
+      return res.status(400).json({ error: 'author_display_too_long' })
+    }
+    const id = randomUUID()
+    const dir = path.join(DATA_ROOT, id)
+    await fs.mkdir(dir, { recursive: true })
+    const meta = {
+      submissionId: id,
+      createdAt: new Date().toISOString(),
+      uploaderDisplayName: authorDisplayName,
+      uploaderStudentId: operatorStudentId,
+      authorDisplayName,
+      displayTitle,
+      mimeType: 'application/x-no-media',
+      originalFileName: '(无媒体)',
+      byteSize: 0,
+      mediaKind: 'image',
+      hasMedia: false,
+    }
+    await fs.writeFile(
+      path.join(dir, 'meta.json'),
+      JSON.stringify(meta),
+      'utf8',
+    )
+    return res.json({ ok: true, submissionId: id })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'save_failed' })
+  }
+})
+
 app.post('/submissions', upload.single('file'), async (req, res) => {
   const id = req._submissionId
   try {
@@ -645,6 +726,7 @@ app.post('/submissions', upload.single('file'), async (req, res) => {
       byteSize: req.file.size,
       mediaKind,
       storageFile: req.file.filename,
+      hasMedia: true,
     }
     await fs.writeFile(
       path.join(DATA_ROOT, id, 'meta.json'),
@@ -671,7 +753,17 @@ app.get('/submissions/:id/media', async (req, res) => {
     const meta = JSON.parse(
       await fs.readFile(path.join(base, 'meta.json'), 'utf8'),
     )
-    const filePath = path.join(base, meta.storageFile || 'media')
+    const storageFile = meta.storageFile
+    if (
+      meta.hasMedia === false ||
+      Number(meta.byteSize) === 0 ||
+      storageFile == null ||
+      typeof storageFile !== 'string' ||
+      storageFile.trim() === ''
+    ) {
+      return res.status(404).end()
+    }
+    const filePath = path.join(base, storageFile)
     res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream')
     res.setHeader('Cache-Control', 'public, max-age=3600')
     res.sendFile(path.resolve(filePath))

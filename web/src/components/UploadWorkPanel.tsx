@@ -1,6 +1,9 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../auth'
-import { submitClassSubmission } from '../lib/submitClassSubmission'
+import {
+  submitClassSubmission,
+  submitTextOnlyClassSubmission,
+} from '../lib/submitClassSubmission'
 import { SUBMISSION_DISPLAY_TITLE_MAX_LEN } from '../lib/submissionDisplayTitle'
 import {
   SUBMISSION_AUTHOR_DISPLAY_MAX_LEN,
@@ -15,7 +18,7 @@ interface UploadWorkPanelProps {
 }
 
 /**
- * 管理员上传作品：填写作品名、作者名，选择文件后提交到班级作品服务器。
+ * 管理员上传：可带图片/视频文件，也可仅登记作品名与作者名（投票用无媒体条目）。
  */
 export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
   const { user } = useAuth()
@@ -55,10 +58,38 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
     onSubmitted()
   }
 
+  /**
+   * 无文件直接登记：不校验表单是否填完，由服务端补全缺省作品名/作者名。
+   */
+  async function handleDirectUpload() {
+    if (!canUpload) {
+      setError('请先登录后再上传作品')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    const result = await submitTextOnlyClassSubmission(
+      user,
+      displayTitle,
+      authorDisplayName,
+    )
+    setBusy(false)
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    setDisplayTitle('')
+    setAuthorDisplayName('')
+    onSubmitted()
+  }
+
   return (
     <div className="upload-panel">
       <p className="upload-hint">
-        支持 JPEG / PNG / WebP / GIF 图片，或 MP4 / WebM 视频；单个文件不超过 160 MB。
+        投票场景可不传图片/视频：填写作品名、作者名（可留空）后点「直接上传」即登记一条无媒体作品；若需展示媒体，仍可选文件上传。
+      </p>
+      <p className="upload-hint upload-hint--secondary">
+        带文件上传时：支持 JPEG / PNG / WebP / GIF 或 MP4 / WebM；单个文件不超过 160 MB。
       </p>
       <div className="auth-field upload-title-field">
         <label htmlFor="submission-display-title">作品名</label>
@@ -67,14 +98,14 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
           type="text"
           maxLength={SUBMISSION_DISPLAY_TITLE_MAX_LEN}
           autoComplete="off"
-          placeholder="在班级列表中展示的名称"
+          placeholder="在班级列表中展示的名称（可空）"
           value={displayTitle}
           disabled={!canUpload || busy}
           onChange={(e) => setDisplayTitle(e.target.value)}
         />
       </div>
       <p className="panel-note">
-        作品名最多 {SUBMISSION_DISPLAY_TITLE_MAX_LEN} 字；将显示在列表中「图片 / 视频 · …」的位置，避免文件名乱码。
+        作品名最多 {SUBMISSION_DISPLAY_TITLE_MAX_LEN} 字；列表中显示为「无媒体 · …」或「图片 / 视频 · …」。
       </p>
       <div className="auth-field upload-title-field">
         <label htmlFor="submission-author-display-name">作者名</label>
@@ -83,7 +114,7 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
           type="text"
           maxLength={SUBMISSION_AUTHOR_DISPLAY_MAX_LEN}
           autoComplete="off"
-          placeholder="排行榜与列表中展示的作者名"
+          placeholder="排行榜与列表中展示的作者名（可空）"
           value={authorDisplayName}
           disabled={!canUpload || busy}
           onChange={(e) => setAuthorDisplayName(e.target.value)}
@@ -91,7 +122,7 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
       </div>
       <p className="panel-note">
         作者名最多 {SUBMISSION_AUTHOR_DISPLAY_MAX_LEN}
-        字；列表与排行榜中的作者均以此为准；学号在后台记录为管理员账号，仅管理员可删除作品。
+        字；学号在后台记录为管理员账号，仅管理员可删除作品。
       </p>
       <input
         ref={inputRef}
@@ -101,14 +132,24 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
         disabled={!canUpload || busy}
         onChange={handleFileChange}
       />
-      <button
-        type="button"
-        className="auth-submit"
-        disabled={!canUpload || busy}
-        onClick={() => inputRef.current?.click()}
-      >
-        {busy ? '正在保存…' : '选择文件并上传'}
-      </button>
+      <div className="upload-actions">
+        <button
+          type="button"
+          className="ux-action-btn ux-action-btn--primary upload-action-primary"
+          disabled={!canUpload || busy}
+          onClick={() => void handleDirectUpload()}
+        >
+          {busy ? '正在保存…' : '直接上传（可无图片/视频）'}
+        </button>
+        <button
+          type="button"
+          className="auth-submit upload-action-file"
+          disabled={!canUpload || busy}
+          onClick={() => inputRef.current?.click()}
+        >
+          {busy ? '正在保存…' : '选择文件并上传'}
+        </button>
+      </div>
       {!canUpload ? (
         <p className="panel-note" role="status">
           未登录，无法上传作品。

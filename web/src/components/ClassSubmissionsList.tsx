@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth'
-import type {
-  ClassSubmissionRecord,
-  SubmissionMediaKind,
-} from '../types/classSubmission'
+import type { ClassSubmissionRecord } from '../types/classSubmission'
 import {
   castServerVote,
   deleteClassSubmission,
@@ -34,8 +31,11 @@ export interface ClassSubmissionsListProps {
   submissionsError: string | null
 }
 
-function mediaKindLabel(kind: SubmissionMediaKind): string {
-  return kind === 'image' ? '图片' : '视频'
+function mediaKindLabel(row: ClassSubmissionRecord): string {
+  if (row.hasMedia === false || row.byteSize === 0) {
+    return '无媒体'
+  }
+  return row.mediaKind === 'image' ? '图片' : '视频'
 }
 
 type SubmissionTierTone = 's' | 'a' | 'b' | 'c'
@@ -118,7 +118,7 @@ function SubmissionRow({
           </span>
         </div>
         <span className="submission-meta">
-          {mediaKindLabel(row.mediaKind)} · {titleShown}
+          {mediaKindLabel(row)} · {titleShown}
           <span className="submission-vote-count" aria-label={`得票 ${row.voteCount} 票`}>
             {' '}
             · {row.voteCount} 票

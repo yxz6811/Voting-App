@@ -97,3 +97,44 @@ export async function submitClassSubmission(
     }
   }
 }
+
+/**
+ * 无文件登记：仅保存作品名/作者名（投票用），服务端会补全缺省字段。
+ *
+ * @param user 当前管理员
+ * @param displayTitleRaw 作品展示名（可空）
+ * @param authorDisplayNameRaw 作者展示名（可空）
+ */
+export async function submitTextOnlyClassSubmission(
+  user: CurrentUser | null,
+  displayTitleRaw: string,
+  authorDisplayNameRaw: string,
+): Promise<SubmitClassSubmissionResult> {
+  if (user == null) {
+    return { ok: false, message: '请先登录后再上传作品' }
+  }
+
+  const base = getSubmissionsApiBase()
+  try {
+    const res = await fetch(`${base}/submissions/text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        operatorDisplayName: user.displayName,
+        operatorStudentId: user.studentId,
+        displayTitle: displayTitleRaw.trim(),
+        authorDisplayName: authorDisplayNameRaw.trim(),
+      }),
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      return { ok: false, message: mapUploadError(res.status, text) }
+    }
+    return { ok: true }
+  } catch {
+    return {
+      ok: false,
+      message: '无法连接作品服务器，请检查网络或稍后再试。',
+    }
+  }
+}

@@ -14,6 +14,8 @@ interface SubmissionMetaJson {
   displayTitle?: string
   authorDisplayName?: string
   voteCount?: number
+  /** 无文件登记时为 `false`；旧数据缺省视为有媒体 */
+  hasMedia?: boolean
 }
 
 /**
@@ -28,7 +30,11 @@ export async function listSubmissionsDesc(): Promise<ClassSubmissionRecord[]> {
     throw new Error(`list_failed:${res.status}`)
   }
   const data = (await res.json()) as SubmissionMetaJson[]
-  return data.map((m) => ({
+  return data.map((m) => {
+    const byteSize = Number(m.byteSize)
+    const safeByte = Number.isFinite(byteSize) && byteSize > 0 ? byteSize : 0
+    const hasMedia = m.hasMedia !== false && safeByte > 0
+    return {
     submissionId: m.submissionId,
     createdAt: m.createdAt,
     uploaderDisplayName: m.uploaderDisplayName,
@@ -43,14 +49,16 @@ export async function listSubmissionsDesc(): Promise<ClassSubmissionRecord[]> {
       typeof m.authorDisplayName === 'string' && m.authorDisplayName.trim() !== ''
         ? m.authorDisplayName.trim()
         : undefined,
-    byteSize: m.byteSize,
+    byteSize: safeByte,
     mediaKind: m.mediaKind,
-    mediaUrl: `${base}/submissions/${m.submissionId}/media`,
+    hasMedia,
+    mediaUrl: hasMedia ? `${base}/submissions/${m.submissionId}/media` : undefined,
     voteCount:
       typeof m.voteCount === 'number' && Number.isFinite(m.voteCount) && m.voteCount >= 0
         ? Math.floor(m.voteCount)
         : 0,
-  }))
+  }
+  })
 }
 
 /**

@@ -32,8 +32,10 @@ export interface ClassSubmissionRecord {
   mediaKind: SubmissionMediaKind
   /** 本地 Blob（仅旧版 IndexedDB；当前以服务端为主） */
   blob?: Blob
-  /** 同源媒体地址（服务端列表） */
+  /** 同源媒体地址（服务端列表）；无媒体登记时为 `undefined` */
   mediaUrl?: string
+  /** 服务端 `meta.hasMedia === false` 时表示仅有文字登记、无可预览文件 */
+  hasMedia?: boolean
   /** 服务端聚合后的得票数（非负整数） */
   voteCount: number
 }

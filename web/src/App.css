@@ -539,11 +539,24 @@
   align-items: flex-start;
 }
 
-.upload-hint,
-.panel-empty,
-.panel-note {
-  color: var(--text);
-  font-size: 0.91rem;
+.upload-hint--secondary {
+  margin-top: -0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  max-width: 31rem;
+}
+
+.upload-action-file {
+  flex: 1 1 10rem;
+  min-width: 0;
 }
 
 .upload-input-hidden {
