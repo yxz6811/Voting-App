@@ -763,7 +763,8 @@
 .vote-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  /* 高于侧栏 sticky / 含 backdrop-filter 的祖先，且挂到 body 后须盖住整页 */
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;

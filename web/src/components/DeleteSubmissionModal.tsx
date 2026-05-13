@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { ClassSubmissionRecord } from '../types/classSubmission'
 import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
 import { submissionAuthorDisplayName } from '../lib/submissionAuthorDisplay'
@@ -30,7 +31,7 @@ export function DeleteSubmissionModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel, submitting])
 
-  return (
+  return createPortal(
     <div
       className="vote-modal-overlay"
       role="presentation"
@@ -73,6 +74,7 @@ export function DeleteSubmissionModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

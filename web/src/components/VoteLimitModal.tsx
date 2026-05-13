@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface VoteLimitModalProps {
   /** 关闭对话框 */
@@ -19,7 +20,7 @@ export function VoteLimitModal({ onClose }: VoteLimitModalProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div
       className="vote-modal-overlay"
       role="presentation"
@@ -45,6 +46,7 @@ export function VoteLimitModal({ onClose }: VoteLimitModalProps) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

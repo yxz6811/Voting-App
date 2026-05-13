@@ -21,3 +21,9 @@ cd web && npm run build && rsync -avz --delete -e "ssh -p 41326" ./dist/ root@19
 ```
 
 API 由 Nginx 反代 `/voting-app-api/`，改 `api/server.mjs` 时需在服务器上单独更新 Node 进程与数据目录，**不要**改其他站点的 Nginx 配置。
+
+cd "/Users/yxz/Desktop/projects/投票小程序/web" && npm run build
+
+cd "/Users/yxz/Desktop/projects/投票小程序/web/dist" && COPYFILE_DISABLE=1 tar cf - . | ssh -p 41326 -o BatchMode=yes root@193.134.211.194 'rm -rf /var/www/voting-app/* && tar xf - -C /var/www/voting-app'
+
+scp -P 41326 -o BatchMode=yes "/Users/yxz/Desktop/projects/投票小程序/api/server.mjs" root@193.134.211.194:/opt/voting-submissions-api/server.mjs && ssh -p 41326 -o BatchMode=yes root@193.134.211.194 'systemctl restart voting-submissions-api.service'
