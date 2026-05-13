@@ -141,8 +141,95 @@
 }
 
 .classroom {
-  max-width: 720px;
+  max-width: 1100px;
   margin: 0 auto;
+  padding: 0 0.75rem;
+}
+
+.classroom-list-with-leaderboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.classroom-list-main {
+  min-width: 0;
+}
+
+.vote-leaderboard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  max-height: min(70vh, 36rem);
+  overflow-y: auto;
+  position: sticky;
+  top: 0.5rem;
+}
+
+.vote-leaderboard-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+  color: var(--text-h);
+}
+
+.vote-leaderboard-status {
+  margin: 0;
+}
+
+.vote-leaderboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.vote-leaderboard-row {
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr) auto;
+  gap: 0.35rem 0.5rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: var(--text-h);
+}
+
+.vote-leaderboard-rank {
+  font-weight: 700;
+  color: var(--accent);
+  text-align: right;
+}
+
+.vote-leaderboard-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vote-leaderboard-count {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .classroom-list-with-leaderboard {
+    grid-template-columns: 1fr;
+  }
+
+  .vote-leaderboard {
+    position: static;
+    max-height: none;
+    order: 2;
+  }
+
+  .classroom-list-main {
+    order: 1;
+  }
 }
 
 .classroom-nav {

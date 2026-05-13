@@ -8,7 +8,6 @@ import {
   castServerVote,
   deleteClassSubmission,
   fetchServerVoteForVoter,
-  listSubmissionsDesc,
 } from '../lib/submissionsDb'
 import {
   persistVote,
@@ -18,11 +17,15 @@ import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
 import { VoteChangeModal } from './VoteChangeModal'
 import { DeleteSubmissionModal } from './DeleteSubmissionModal'
 
-interface ClassSubmissionsListProps {
-  /** 父级递增以触发重新加载 */
+export interface ClassSubmissionsListProps {
+  /** 父级递增以触发投票同步与列表重建 */
   refreshKey: number
   /** 删除等变更成功后通知父级抬高 `refreshKey` */
   onListMutated?: () => void
+  /** 父级 `listSubmissionsDesc` 结果 */
+  submissions: ClassSubmissionRecord[]
+  submissionsLoading: boolean
+  submissionsError: string | null
 }
 
 function mediaKindLabel(kind: SubmissionMediaKind): string {
@@ -127,17 +130,20 @@ function SubmissionRow({
 
 /**
  * 班级作品列表：新在前、作者信息、预览、投票与改投确认。
+ *
+ * 列表数据由父级拉取并传入，与排行榜共用同一请求结果。
  */
 export function ClassSubmissionsList({
   refreshKey,
   onListMutated,
+  submissions,
+  submissionsLoading,
+  submissionsError,
 }: ClassSubmissionsListProps) {
   const { user } = useAuth()
   const [items, setItems] = useState<
     { row: ClassSubmissionRecord; url: string }[]
   >([])
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [activeVoteId, setActiveVoteId] = useState<string | null>(null)
   const [changeVoteTarget, setChangeVoteTarget] =
     useState<ClassSubmissionRecord | null>(null)
@@ -149,56 +155,46 @@ export function ClassSubmissionsList({
   const [voteSubmitting, setVoteSubmitting] = useState(false)
 
   useEffect(() => {
+    if (submissionsLoading || submissionsError != null) {
+      return
+    }
     let alive = true
     const revokeList: string[] = []
 
-    setLoadError(null)
-    setLoading(true)
-
     ;(async () => {
-      try {
-        const rows = await listSubmissionsDesc()
-        if (!alive) {
-          return
-        }
-        const ids = new Set(rows.map((r) => r.submissionId))
-        let nextActive: string | null = null
-        if (user != null) {
-          try {
-            const srv = await fetchServerVoteForVoter(user.studentId)
-            if (srv != null && ids.has(srv)) {
-              persistVote(user.studentId, srv)
-            }
-          } catch {
-            /* 无法拉取服务端选票时仍以本地为准 */
+      const rows = submissions
+      const ids = new Set(rows.map((r) => r.submissionId))
+      let nextActive: string | null = null
+      if (user != null) {
+        try {
+          const srv = await fetchServerVoteForVoter(user.studentId)
+          if (srv != null && ids.has(srv)) {
+            persistVote(user.studentId, srv)
           }
-          nextActive = reconcileVoteWithSubmissions(ids, user.studentId)
+        } catch {
+          /* 无法拉取服务端选票时仍以本地为准 */
         }
-        const next = rows.map((row) => {
-          if (row.mediaUrl != null && row.mediaUrl !== '') {
-            return { row, url: row.mediaUrl }
-          }
-          if (row.blob != null) {
-            const url = URL.createObjectURL(row.blob)
-            revokeList.push(url)
-            return { row, url }
-          }
-          return { row, url: '' }
-        })
-        setItems(next)
-        setActiveVoteId(nextActive)
-      } catch {
-        if (!alive) {
-          return
-        }
-        setLoadError('加载班级列表失败，请刷新页面重试。')
-        setItems([])
-        setActiveVoteId(null)
-      } finally {
-        if (alive) {
-          setLoading(false)
-        }
+        nextActive = reconcileVoteWithSubmissions(ids, user.studentId)
       }
+      const next = rows.map((row) => {
+        if (row.mediaUrl != null && row.mediaUrl !== '') {
+          return { row, url: row.mediaUrl }
+        }
+        if (row.blob != null) {
+          const url = URL.createObjectURL(row.blob)
+          revokeList.push(url)
+          return { row, url }
+        }
+        return { row, url: '' }
+      })
+      if (!alive) {
+        for (const u of revokeList) {
+          URL.revokeObjectURL(u)
+        }
+        return
+      }
+      setItems(next)
+      setActiveVoteId(nextActive)
     })()
 
     return () => {
@@ -207,7 +203,13 @@ export function ClassSubmissionsList({
         URL.revokeObjectURL(u)
       }
     }
-  }, [refreshKey, user?.studentId])
+  }, [
+    submissions,
+    submissionsLoading,
+    submissionsError,
+    user?.studentId,
+    refreshKey,
+  ])
 
   function handleVoteClick(row: ClassSubmissionRecord) {
     if (user == null) {
@@ -303,7 +305,7 @@ export function ClassSubmissionsList({
     }
   }
 
-  if (loading) {
+  if (submissionsLoading) {
     return (
       <p className="panel-empty" aria-busy="true">
         正在加载班级列表…
@@ -311,10 +313,10 @@ export function ClassSubmissionsList({
     )
   }
 
-  if (loadError != null) {
+  if (submissionsError != null) {
     return (
       <div className="panel-error" role="alert">
-        {loadError}
+        {submissionsError}
       </div>
     )
   }
