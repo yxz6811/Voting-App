@@ -45,7 +45,7 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
   return (
     <div className="upload-panel">
       <p className="upload-hint">
-        支持 JPEG / PNG / WebP / GIF 图片，或 MP4 / WebM 视频；单个文件不超过 80 MB。
+        支持 JPEG / PNG / WebP / GIF 图片，或 MP4 / WebM 视频；单个文件不超过 160 MB。
       </p>
       <input
         ref={inputRef}

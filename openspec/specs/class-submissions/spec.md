@@ -38,11 +38,11 @@ The system SHALL accept user-selected files whose detected media kind is either 
 
 ### Requirement: Submission file size limit
 
-The system SHALL reject any submission whose selected file byte size exceeds **80 MiB** (`80 * 1024 * 1024` bytes).
+The system SHALL reject any submission whose selected file byte size exceeds **160 MiB** (`160 * 1024 * 1024` bytes).
 
 #### Scenario: Oversized file is rejected
 
-- **WHEN** a logged-in user selects a file larger than 80 MiB
+- **WHEN** a logged-in user selects a file larger than 160 MiB
 - **THEN** the system SHALL reject the submission with a clear error message and SHALL NOT persist a new class list entry for that file
 
 ### Requirement: Successful submission persists and appears in class list

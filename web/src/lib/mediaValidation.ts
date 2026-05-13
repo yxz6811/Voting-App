@@ -1,7 +1,7 @@
 import type { SubmissionMediaKind } from '../types/classSubmission'
 
-/** 单文件大小上限：80 MiB（与 spec 一致） */
-export const MAX_SUBMISSION_BYTES = 80 * 1024 * 1024
+/** 单文件大小上限：160 MiB（与 spec 一致） */
+export const MAX_SUBMISSION_BYTES = 160 * 1024 * 1024
 
 const ALLOWED_IMAGE_MIMES = new Set([
   'image/jpeg',
@@ -63,7 +63,7 @@ export function classifySubmissionFile(file: File): ClassifyFileResult {
   if (file.size > MAX_SUBMISSION_BYTES) {
     return {
       ok: false,
-      message: '文件不能超过 80 MB',
+      message: '文件不能超过 160 MB',
     }
   }
 

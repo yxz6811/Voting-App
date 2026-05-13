@@ -22,7 +22,9 @@ export function LoginForm() {
   return (
     <div className="auth-card">
       <h1 className="auth-title">登录</h1>
-      <p className="auth-sub">请输入姓名与学号以继续使用投票小程序</p>
+      <p className="auth-sub">
+        请输入姓名与学号（学号为本班 1–50 号）以继续使用投票小程序
+      </p>
       <form className="auth-form" onSubmit={handleSubmit}>
         {error != null ? (
           <div className="auth-error" role="alert">
@@ -43,10 +45,11 @@ export function LoginForm() {
           <span>学号</span>
           <input
             name="studentId"
+            inputMode="numeric"
             autoComplete="username"
             value={studentId}
             onChange={(ev) => setStudentId(ev.target.value)}
-            placeholder="如 1–50 或字母数字组合，最多 20 位"
+            placeholder="请输入 1–50，如 7、38"
           />
         </label>
         <button type="submit" className="auth-submit">

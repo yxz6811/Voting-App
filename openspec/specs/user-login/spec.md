@@ -14,16 +14,16 @@ The system SHALL provide a login experience where the user MUST enter both 姓�
 
 ### Requirement: Input validation for 姓名 and 学号
 
-The system SHALL validate 姓名 and 学号 before accepting a login attempt. 姓名 MUST be non-empty after trimming leading and trailing whitespace and MUST NOT exceed 32 Unicode code points. 学号 MUST be non-empty after trimming and MUST match the regular expression `^[0-9A-Za-z]{1,20}$`.
+The system SHALL validate 姓名 and 学号 before accepting a login attempt. 姓名 MUST be non-empty after trimming leading and trailing whitespace and MUST NOT exceed 32 Unicode code points. 学号 MUST be non-empty after trimming and MUST be a decimal class number from **1** through **50** inclusive with **no leading zeros** (equivalently MUST match the regular expression `^(?:[1-9]|[1-4][0-9]|50)$`).
 
 #### Scenario: Successful validation
 
-- **WHEN** 姓名 is non-empty after trim and its length is at most 32 code points AND 学号 matches `^[0-9A-Za-z]{1,20}$` after trim
+- **WHEN** 姓名 is non-empty after trim and its length is at most 32 code points AND 学号 after trim matches `^(?:[1-9]|[1-4][0-9]|50)$`
 - **THEN** the system SHALL allow the login action to proceed to authentication success path
 
-#### Scenario: Short numeric student id is accepted
+#### Scenario: Class numbers 1 through 50 are accepted
 
-- **WHEN** 姓名 is valid AND 学号 after trim is `38` (or any non-empty string matching `^[0-9A-Za-z]{1,20}$` such as class numbers `1` through `50`)
+- **WHEN** 姓名 is valid AND 学号 after trim is `1`, `9`, `38`, or `50`
 - **THEN** the system SHALL allow the login action to proceed to authentication success path
 
 #### Scenario: Rejected login for invalid 姓名
@@ -33,7 +33,7 @@ The system SHALL validate 姓名 and 学号 before accepting a login attempt. �
 
 #### Scenario: Rejected login for invalid 学号
 
-- **WHEN** 学号 is empty after trim OR does not match `^[0-9A-Za-z]{1,20}$`
+- **WHEN** 学号 is empty after trim OR does not match `^(?:[1-9]|[1-4][0-9]|50)$` (including leading zeros such as `01`, values outside 1–50, or non-digit characters)
 - **THEN** the system SHALL reject login and SHALL NOT enter logged-in state
 
 ### Requirement: Successful login establishes session
