@@ -479,8 +479,26 @@
   color: var(--text-h);
 }
 
-.vote-button:hover {
-  filter: brightness(1.02);
+.vote-cancel-btn {
+  font: inherit;
+  cursor: pointer;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  margin-left: 0.35rem;
+}
+
+.vote-cancel-btn:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+.vote-cancel-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .vote-badge {

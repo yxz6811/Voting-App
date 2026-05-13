@@ -7,16 +7,18 @@ import type {
 import {
   castServerVote,
   deleteClassSubmission,
-  fetchServerVoteForVoter,
+  fetchServerVotesForVoter,
+  withdrawServerVote,
 } from '../lib/submissionsDb'
 import {
-  persistVote,
-  reconcileVoteWithSubmissions,
+  persistVotes,
+  reconcileVotesWithSubmissions,
+  VOTES_PER_USER,
 } from '../lib/voteStorage'
 import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
 import { submissionAuthorDisplayName } from '../lib/submissionAuthorDisplay'
 import { isClassSubmissionAdmin } from '../lib/classSubmissionAdmin'
-import { VoteChangeModal } from './VoteChangeModal'
+import { VoteLimitModal } from './VoteLimitModal'
 import { DeleteSubmissionModal } from './DeleteSubmissionModal'
 
 export interface ClassSubmissionsListProps {
@@ -44,6 +46,8 @@ interface SubmissionRowProps {
   /** 正在提交投票，禁用「投票」防重复 */
   voteBusy: boolean
   onVote: () => void
+  /** 取消对该作品的投票 */
+  onCancelVote: () => void
   /** 点击「删除」时调用；仅管理员会渲染该按钮 */
   onRequestDelete: () => void
 }
@@ -59,6 +63,7 @@ function SubmissionRow({
   showAdminDelete,
   voteBusy,
   onVote,
+  onCancelVote,
   onRequestDelete,
 }: SubmissionRowProps) {
   const [mediaFailed, setMediaFailed] = useState(false)
@@ -121,9 +126,19 @@ function SubmissionRow({
           <>
             <div className="submission-vote-actions">
               {isVoted ? (
-                <span className="vote-badge" aria-current="true">
-                  已投票
-                </span>
+                <>
+                  <span className="vote-badge" aria-current="true">
+                    已投票
+                  </span>
+                  <button
+                    type="button"
+                    className="vote-cancel-btn"
+                    disabled={voteBusy}
+                    onClick={onCancelVote}
+                  >
+                    取消
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
@@ -152,7 +167,7 @@ function SubmissionRow({
 }
 
 /**
- * 班级作品列表：新在前、作者信息、预览、投票与改投确认。
+ * 班级作品列表：新在前、作者信息、预览、投票（每人最多 10 票）与删除。
  *
  * 列表数据由父级拉取并传入，与排行榜共用同一请求结果。
  */
@@ -168,9 +183,8 @@ export function ClassSubmissionsList({
   const [items, setItems] = useState<
     { row: ClassSubmissionRecord; url: string }[]
   >([])
-  const [activeVoteId, setActiveVoteId] = useState<string | null>(null)
-  const [changeVoteTarget, setChangeVoteTarget] =
-    useState<ClassSubmissionRecord | null>(null)
+  const [votedSubmissionIds, setVotedSubmissionIds] = useState<string[]>([])
+  const [voteLimitOpen, setVoteLimitOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] =
     useState<ClassSubmissionRecord | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
@@ -188,17 +202,16 @@ export function ClassSubmissionsList({
     ;(async () => {
       const rows = submissions
       const ids = new Set(rows.map((r) => r.submissionId))
-      let nextActive: string | null = null
+      let nextIds: string[] = []
       if (user != null) {
         try {
-          const srv = await fetchServerVoteForVoter(user.studentId)
-          if (srv != null && ids.has(srv)) {
-            persistVote(user.studentId, srv)
-          }
+          const srv = await fetchServerVotesForVoter(user.studentId)
+          const filtered = srv.filter((id) => ids.has(id))
+          persistVotes(user.studentId, filtered)
+          nextIds = filtered
         } catch {
-          /* 无法拉取服务端选票时仍以本地为准 */
+          nextIds = reconcileVotesWithSubmissions(ids, user.studentId)
         }
-        nextActive = reconcileVoteWithSubmissions(ids, user.studentId)
       }
       const next = rows.map((row) => {
         if (row.mediaUrl != null && row.mediaUrl !== '') {
@@ -218,7 +231,7 @@ export function ClassSubmissionsList({
         return
       }
       setItems(next)
-      setActiveVoteId(nextActive)
+      setVotedSubmissionIds(nextIds)
     })()
 
     return () => {
@@ -242,59 +255,67 @@ export function ClassSubmissionsList({
     if (row.uploaderStudentId === user.studentId) {
       return
     }
-    if (activeVoteId === row.submissionId) {
+    if (votedSubmissionIds.includes(row.submissionId)) {
       return
     }
     if (voteSubmitting) {
       return
     }
-    if (activeVoteId == null) {
-      setVoteActionError(null)
-      void (async () => {
-        setVoteSubmitting(true)
-        try {
-          await castServerVote(user.studentId, row.submissionId)
-          persistVote(user.studentId, row.submissionId)
-          setActiveVoteId(row.submissionId)
-          onListMutated?.()
-        } catch (e) {
-          setVoteActionError(
-            e instanceof Error ? e.message : '投票失败，请稍后重试。',
-          )
-        } finally {
-          setVoteSubmitting(false)
-        }
-      })()
-      return
-    }
-    setChangeVoteTarget(row)
-  }
-
-  function handleConfirmChangeVote() {
-    if (user == null || changeVoteTarget == null || voteSubmitting) {
+    if (votedSubmissionIds.length >= VOTES_PER_USER) {
+      setVoteLimitOpen(true)
       return
     }
     setVoteActionError(null)
     void (async () => {
       setVoteSubmitting(true)
       try {
-        await castServerVote(user.studentId, changeVoteTarget.submissionId)
-        persistVote(user.studentId, changeVoteTarget.submissionId)
-        setActiveVoteId(changeVoteTarget.submissionId)
-        setChangeVoteTarget(null)
+        await castServerVote(user.studentId, row.submissionId)
+        const next = [...votedSubmissionIds, row.submissionId]
+        persistVotes(user.studentId, next)
+        setVotedSubmissionIds(next)
         onListMutated?.()
       } catch (e) {
-        setVoteActionError(
-          e instanceof Error ? e.message : '改投失败，请稍后重试。',
-        )
+        const code =
+          typeof e === 'object' &&
+          e !== null &&
+          'errorCode' in e &&
+          typeof (e as { errorCode: unknown }).errorCode === 'string'
+            ? (e as { errorCode: string }).errorCode
+            : ''
+        if (code === 'vote_limit_exceeded') {
+          setVoteLimitOpen(true)
+        } else {
+          setVoteActionError(
+            e instanceof Error ? e.message : '投票失败，请稍后重试。',
+          )
+        }
       } finally {
         setVoteSubmitting(false)
       }
     })()
   }
 
-  function handleCancelChangeVote() {
-    setChangeVoteTarget(null)
+  function handleCancelVote(row: ClassSubmissionRecord) {
+    if (user == null || voteSubmitting) {
+      return
+    }
+    setVoteActionError(null)
+    void (async () => {
+      setVoteSubmitting(true)
+      try {
+        await withdrawServerVote(user.studentId, row.submissionId)
+        const next = votedSubmissionIds.filter((id) => id !== row.submissionId)
+        persistVotes(user.studentId, next)
+        setVotedSubmissionIds(next)
+        onListMutated?.()
+      } catch (e) {
+        setVoteActionError(
+          e instanceof Error ? e.message : '取消投票失败，请稍后重试。',
+        )
+      } finally {
+        setVoteSubmitting(false)
+      }
+    })()
   }
 
   function handleOpenDelete(row: ClassSubmissionRecord) {
@@ -355,14 +376,7 @@ export function ClassSubmissionsList({
 
   return (
     <>
-      {changeVoteTarget != null ? (
-        <VoteChangeModal
-          target={changeVoteTarget}
-          submitting={voteSubmitting}
-          onCancel={handleCancelChangeVote}
-          onConfirm={handleConfirmChangeVote}
-        />
-      ) : null}
+      {voteLimitOpen ? <VoteLimitModal onClose={() => setVoteLimitOpen(false)} /> : null}
       {deleteTarget != null ? (
         <DeleteSubmissionModal
           target={deleteTarget}
@@ -390,11 +404,12 @@ export function ClassSubmissionsList({
               <SubmissionRow
                 row={row}
                 previewUrl={url}
-                isVoted={activeVoteId === row.submissionId}
+                isVoted={votedSubmissionIds.includes(row.submissionId)}
                 isOwn={isOwnRow}
                 showAdminDelete={showAdminDelete}
                 voteBusy={voteSubmitting}
                 onVote={() => handleVoteClick(row)}
+                onCancelVote={() => handleCancelVote(row)}
                 onRequestDelete={() => handleOpenDelete(row)}
               />
             </li>

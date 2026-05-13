@@ -1,6 +1,6 @@
 /**
  * 班级作品集中存储 API：磁盘目录 + meta.json，供所有浏览器/账号共享列表。
- * 投票：`votes.json`（voterStudentId → votedSubmissionId），原子写入。
+ * 投票：`votes.json` 存 `voterStudentId → votedSubmissionId[]`（每人最多 10 票，不重复），原子写入。
  *
  * 环境变量：
  * - `VOTING_DATA_DIR`：数据根目录（默认 `./data`）
@@ -27,36 +27,80 @@ const VOTES_FILE = path.join(DATA_ROOT, 'votes.json')
 
 await fs.mkdir(DATA_ROOT, { recursive: true })
 
+const MAX_VOTES_PER_VOTER = 10
+
 /**
- * @returns {Promise<Record<string, string>>}
+ * 将磁盘上的投票表规范为「学号 → UUID 数组」；兼容旧版「学号 → 单个 UUID 字符串」。
+ *
+ * @param {unknown} raw
+ * @returns {Record<string, string[]>}
  */
-async function readVoteMap() {
+function normalizeVoteMapShape(raw) {
+  /** @type {Record<string, string[]>} */
+  const out = {}
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return out
+  }
+  for (const [k, v] of Object.entries(raw)) {
+    const key = typeof k === 'string' ? k.trim() : ''
+    if (!key) {
+      continue
+    }
+    if (Array.isArray(v)) {
+      const arr = [
+        ...new Set(
+          v
+            .filter((x) => typeof x === 'string' && UUID_RE.test(x.trim()))
+            .map((x) => x.trim()),
+        ),
+      ]
+      if (arr.length > 0) {
+        out[key] = arr
+      }
+    } else if (typeof v === 'string') {
+      const s = v.trim()
+      if (UUID_RE.test(s)) {
+        out[key] = [s]
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * @returns {Promise<Record<string, string[]>>}
+ */
+async function readVoteMultiMap() {
   try {
     const raw = await fs.readFile(VOTES_FILE, 'utf8')
     const o = JSON.parse(raw)
-    if (typeof o !== 'object' || o === null || Array.isArray(o)) {
-      return {}
-    }
-    /** @type {Record<string, string>} */
-    const out = {}
-    for (const [k, v] of Object.entries(o)) {
-      if (typeof k === 'string' && typeof v === 'string' && k.trim() && v.trim()) {
-        out[k.trim()] = v.trim()
-      }
-    }
-    return out
+    return normalizeVoteMapShape(o)
   } catch {
     return {}
   }
 }
 
 /**
- * @param {Record<string, string>} map
+ * @param {Record<string, string[]>} map
  */
-async function writeVoteMapAtomic(map) {
+async function writeVoteMultiMapAtomic(map) {
   const tmp = path.join(DATA_ROOT, `votes.${randomUUID()}.tmp.json`)
   await fs.writeFile(tmp, JSON.stringify(map, null, 0), 'utf8')
   await fs.rename(tmp, VOTES_FILE)
+}
+
+/**
+ * @deprecated 使用 {@link readVoteMultiMap}
+ */
+async function readVoteMap() {
+  return readVoteMultiMap()
+}
+
+/**
+ * @deprecated 使用 {@link writeVoteMultiMapAtomic}
+ */
+async function writeVoteMapAtomic(map) {
+  return writeVoteMultiMapAtomic(map)
 }
 
 /**
@@ -75,29 +119,44 @@ async function submissionMetaExists(submissionId) {
 }
 
 /**
- * @param {Record<string, string>} map
+ * @param {Record<string, string[]>} map
  * @param {Set<string>} validSubmissionIds
  * @returns {boolean} 是否写回磁盘
  */
 function pruneVotesNotInList(map, validSubmissionIds) {
   let changed = false
-  for (const [voter, sid] of Object.entries(map)) {
-    if (!validSubmissionIds.has(sid)) {
+  for (const [voter, arr] of Object.entries(map)) {
+    if (!Array.isArray(arr)) {
       delete map[voter]
       changed = true
+      continue
+    }
+    const next = arr.filter((sid) => validSubmissionIds.has(sid))
+    if (next.length !== arr.length) {
+      changed = true
+    }
+    if (next.length === 0) {
+      delete map[voter]
+    } else {
+      map[voter] = next
     }
   }
   return changed
 }
 
 /**
- * @param {Record<string, string>} map
+ * @param {Record<string, string[]>} map
  * @returns {Map<string, number>}
  */
 function tallyVotes(map) {
   const counts = new Map()
-  for (const sid of Object.values(map)) {
-    counts.set(sid, (counts.get(sid) ?? 0) + 1)
+  for (const arr of Object.values(map)) {
+    if (!Array.isArray(arr)) {
+      continue
+    }
+    for (const sid of arr) {
+      counts.set(sid, (counts.get(sid) ?? 0) + 1)
+    }
   }
   return counts
 }
@@ -110,10 +169,18 @@ function tallyVotes(map) {
 async function removeVotesForSubmission(submissionId) {
   const map = await readVoteMap()
   let changed = false
-  for (const [voter, sid] of Object.entries(map)) {
-    if (sid === submissionId) {
-      delete map[voter]
+  for (const [voter, arr] of Object.entries(map)) {
+    if (!Array.isArray(arr)) {
+      continue
+    }
+    const next = arr.filter((sid) => sid !== submissionId)
+    if (next.length !== arr.length) {
       changed = true
+    }
+    if (next.length === 0) {
+      delete map[voter]
+    } else {
+      map[voter] = next
     }
   }
   if (changed) {
@@ -156,16 +223,25 @@ app.get('/votes/by-voter', async (req, res) => {
       return res.status(400).json({ error: 'missing_voter' })
     }
     const map = await readVoteMap()
-    const sid = map[voterStudentId]
-    if (sid == null || sid === '') {
-      return res.json({ votedSubmissionId: null })
+    let list = map[voterStudentId] ?? []
+    if (!Array.isArray(list)) {
+      list = []
     }
-    if (!(await submissionMetaExists(sid))) {
-      delete map[voterStudentId]
+    const next = []
+    for (const sid of list) {
+      if (await submissionMetaExists(sid)) {
+        next.push(sid)
+      }
+    }
+    if (next.length !== list.length) {
+      if (next.length === 0) {
+        delete map[voterStudentId]
+      } else {
+        map[voterStudentId] = next
+      }
       await writeVoteMapAtomic(map)
-      return res.json({ votedSubmissionId: null })
     }
-    return res.json({ votedSubmissionId: sid })
+    return res.json({ votedSubmissionIds: next })
   } catch (e) {
     console.error(e)
     return res.status(500).json({ error: 'vote_read_failed' })
@@ -193,7 +269,47 @@ app.put('/votes', async (req, res) => {
       return res.status(403).json({ error: 'cannot_vote_own' })
     }
     const map = await readVoteMap()
-    map[voterStudentId] = votedSubmissionId
+    const cur = Array.isArray(map[voterStudentId])
+      ? [...map[voterStudentId]]
+      : []
+    if (cur.includes(votedSubmissionId)) {
+      return res.status(204).send()
+    }
+    if (cur.length >= MAX_VOTES_PER_VOTER) {
+      return res.status(403).json({ error: 'vote_limit_exceeded' })
+    }
+    cur.push(votedSubmissionId)
+    map[voterStudentId] = cur
+    await writeVoteMapAtomic(map)
+    return res.status(204).send()
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'vote_write_failed' })
+  }
+})
+
+app.delete('/votes', async (req, res) => {
+  try {
+    const voterStudentId = String(req.body?.voterStudentId ?? '').trim()
+    const votedSubmissionId = String(req.body?.votedSubmissionId ?? '').trim()
+    if (!voterStudentId || !votedSubmissionId) {
+      return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!UUID_RE.test(votedSubmissionId)) {
+      return res.status(400).json({ error: 'invalid_submission_id' })
+    }
+    const map = await readVoteMap()
+    const cur = Array.isArray(map[voterStudentId]) ? [...map[voterStudentId]] : []
+    const idx = cur.indexOf(votedSubmissionId)
+    if (idx === -1) {
+      return res.status(404).json({ error: 'vote_not_found' })
+    }
+    cur.splice(idx, 1)
+    if (cur.length === 0) {
+      delete map[voterStudentId]
+    } else {
+      map[voterStudentId] = cur
+    }
     await writeVoteMapAtomic(map)
     return res.status(204).send()
   } catch (e) {

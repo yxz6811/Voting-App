@@ -54,27 +54,39 @@ export async function listSubmissionsDesc(): Promise<ClassSubmissionRecord[]> {
 }
 
 /**
- * 读取服务端当前学号对应的在投作品 ID（若无或未命中有效作品则为 `null`）。
+ * 读取服务端当前学号已投的作品 ID 列表（去重、有序无关）。
  *
  * @param voterStudentId 投票者学号
  * @throws {Error} HTTP 非 2xx 或网络失败
  */
-export async function fetchServerVoteForVoter(
+export async function fetchServerVotesForVoter(
   voterStudentId: string,
-): Promise<string | null> {
+): Promise<string[]> {
   const base = getSubmissionsApiBase()
   const url = `${base}/votes/by-voter?voterStudentId=${encodeURIComponent(voterStudentId)}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`vote_read_failed:${res.status}`)
   }
-  const data = (await res.json()) as { votedSubmissionId?: string | null }
+  const data = (await res.json()) as {
+    votedSubmissionIds?: unknown
+    votedSubmissionId?: string | null
+  }
+  if (Array.isArray(data.votedSubmissionIds)) {
+    const ids = data.votedSubmissionIds.filter(
+      (x): x is string => typeof x === 'string' && x.trim() !== '',
+    )
+    return [...new Set(ids)]
+  }
   const sid = data.votedSubmissionId
-  return typeof sid === 'string' && sid !== '' ? sid : null
+  if (typeof sid === 'string' && sid.trim() !== '') {
+    return [sid.trim()]
+  }
+  return []
 }
 
 /**
- * 向服务端提交或改投一票（每人至多一票；规则由服务端校验）。
+ * 向服务端追加一票（同一作品不重复计数；满 10 票时服务端拒绝）。
  *
  * @param voterStudentId 投票者学号
  * @param votedSubmissionId 被投作品 ID
@@ -127,6 +139,9 @@ function mapCastVoteMessage(status: number, errorCode: string): string {
   if (errorCode === 'cannot_vote_own') {
     return '不能给自己的作品投票。'
   }
+  if (errorCode === 'vote_limit_exceeded') {
+    return '你已经投过十票了！'
+  }
   if (errorCode === 'submission_not_found') {
     return '该作品已不存在，无法投票。'
   }
@@ -137,6 +152,69 @@ function mapCastVoteMessage(status: number, errorCode: string): string {
     return '服务器繁忙，投票未保存，请稍后重试。'
   }
   return '投票失败，请稍后重试。'
+}
+
+/**
+ * 取消对某一作品的投票（服务端从该用户的已投列表中移除）。
+ *
+ * @param voterStudentId 投票者学号
+ * @param votedSubmissionId 要取消的作品 ID
+ * @throws {Error} 非 2xx 或网络失败
+ */
+export async function withdrawServerVote(
+  voterStudentId: string,
+  votedSubmissionId: string,
+): Promise<void> {
+  const base = getSubmissionsApiBase()
+  let res: Response
+  try {
+    res = await fetch(`${base}/votes`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voterStudentId, votedSubmissionId }),
+    })
+  } catch (e) {
+    const err = new Error('网络异常，无法取消投票。')
+    ;(err as Error & { cause?: unknown }).cause = e
+    throw err
+  }
+  if (res.ok) {
+    return
+  }
+  let errorCode = `http_${res.status}`
+  try {
+    const body: unknown = await res.json()
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'error' in body &&
+      typeof (body as { error: unknown }).error === 'string'
+    ) {
+      errorCode = (body as { error: string }).error
+    }
+  } catch {
+    /* ignore */
+  }
+  const err = new Error(mapWithdrawVoteMessage(res.status, errorCode))
+  ;(err as Error & { errorCode?: string }).errorCode = errorCode
+  throw err
+}
+
+/**
+ * @param status HTTP 状态码
+ * @param errorCode 服务端 `error` 字段
+ */
+function mapWithdrawVoteMessage(status: number, errorCode: string): string {
+  if (errorCode === 'vote_not_found') {
+    return '当前未投票给该作品，无需取消。'
+  }
+  if (errorCode === 'missing_fields' || errorCode === 'invalid_submission_id') {
+    return '取消投票请求无效，请刷新页面后重试。'
+  }
+  if (status >= 500) {
+    return '服务器繁忙，请稍后重试。'
+  }
+  return '取消投票失败，请稍后重试。'
 }
 
 /**
