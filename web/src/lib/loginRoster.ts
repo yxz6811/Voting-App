@@ -1,6 +1,6 @@
 /**
  * 允许登录的「学号 → 姓名」白名单，与仓库根目录 `number.md` 一致。
- * 服务端校验须同步维护仓库内 `api/loginRoster.mjs`。
+ * 服务端同一份数据内联在 `api/server.mjs`（`LOGIN_ROSTER_BY_STUDENT_ID`），修改名单时请一并更新。
  */
 export const LOGIN_ROSTER_BY_STUDENT_ID: Readonly<Record<string, string>> =
   Object.freeze({
