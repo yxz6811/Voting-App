@@ -1,5 +1,8 @@
+import { ADMIN_STUDENT_ID } from './classSubmissionAdmin'
+
 /**
- * 学号：本班固定为十进制数字 **1–50**，不允许前导零（如 `01`）、字母或超出范围。
+ * 学号：本班固定为十进制数字 **1–50**，不允许前导零（如 `01`）、字母或超出范围；
+ * 另允许管理员专用学号 **6811**（与 {@link ADMIN_STUDENT_ID} 一致）。
  */
 const STUDENT_ID_PATTERN = /^(?:[1-9]|[1-4][0-9]|50)$/
 
@@ -35,10 +38,10 @@ export function validateDisplayName(
 }
 
 /**
- * 校验学号：trim 后须为 **1–50** 的正整数（字符串形式，无前导零）。
+ * 校验学号：trim 后须为 **1–50** 的正整数（无前导零），或管理员学号 **6811**。
  *
  * @param raw 用户输入
- * @returns 成功时返回 trim 后的学号；失败时返回错误文案
+ * @returns 成功时返回 trim 后的学号；失败时返回错误文案（对非法输入仍为 1–50 提示）
  */
 export function validateStudentId(
   raw: string,
@@ -48,6 +51,9 @@ export function validateStudentId(
   const value = raw.trim()
   if (value.length === 0) {
     return { ok: false, message: '学号不能为空' }
+  }
+  if (value === ADMIN_STUDENT_ID) {
+    return { ok: true, value }
   }
   if (!STUDENT_ID_PATTERN.test(value)) {
     return {

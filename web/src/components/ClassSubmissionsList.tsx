@@ -14,6 +14,8 @@ import {
   reconcileVoteWithSubmissions,
 } from '../lib/voteStorage'
 import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
+import { submissionAuthorDisplayName } from '../lib/submissionAuthorDisplay'
+import { isClassSubmissionAdmin } from '../lib/classSubmissionAdmin'
 import { VoteChangeModal } from './VoteChangeModal'
 import { DeleteSubmissionModal } from './DeleteSubmissionModal'
 
@@ -37,10 +39,12 @@ interface SubmissionRowProps {
   previewUrl: string
   isVoted: boolean
   isOwn: boolean
+  /** 管理员在所有条目上显示删除 */
+  showAdminDelete: boolean
   /** 正在提交投票，禁用「投票」防重复 */
   voteBusy: boolean
   onVote: () => void
-  /** 点击「删除」时调用；仅本人条目会渲染该按钮 */
+  /** 点击「删除」时调用；仅管理员会渲染该按钮 */
   onRequestDelete: () => void
 }
 
@@ -52,6 +56,7 @@ function SubmissionRow({
   previewUrl,
   isVoted,
   isOwn,
+  showAdminDelete,
   voteBusy,
   onVote,
   onRequestDelete,
@@ -60,11 +65,12 @@ function SubmissionRow({
   const cardClass =
     'submission-card' + (isVoted ? ' submission-card--voted' : '')
   const titleShown = submissionDisplayLabel(row)
+  const authorShown = submissionAuthorDisplayName(row)
 
   return (
     <article className={cardClass}>
       <header className="submission-card-head">
-        <span className="submission-author">{row.uploaderDisplayName}</span>
+        <span className="submission-author">{authorShown}</span>
         <span className="submission-meta">
           {mediaKindLabel(row.mediaKind)} · {titleShown}
           <span className="submission-vote-count" aria-label={`得票 ${row.voteCount} 票`}>
@@ -101,27 +107,44 @@ function SubmissionRow({
         {isOwn ? (
           <div className="submission-own-row">
             <span className="vote-own-label">本人作品，不参与投票</span>
-            <button
-              type="button"
-              className="submission-delete-btn"
-              onClick={onRequestDelete}
-            >
-              删除作品
-            </button>
+            {showAdminDelete ? (
+              <button
+                type="button"
+                className="submission-delete-btn"
+                onClick={onRequestDelete}
+              >
+                删除作品
+              </button>
+            ) : null}
           </div>
-        ) : isVoted ? (
-          <span className="vote-badge" aria-current="true">
-            已投票
-          </span>
         ) : (
-          <button
-            type="button"
-            className="vote-button"
-            disabled={voteBusy}
-            onClick={onVote}
-          >
-            投票
-          </button>
+          <>
+            <div className="submission-vote-actions">
+              {isVoted ? (
+                <span className="vote-badge" aria-current="true">
+                  已投票
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="vote-button"
+                  disabled={voteBusy}
+                  onClick={onVote}
+                >
+                  投票
+                </button>
+              )}
+            </div>
+            {showAdminDelete ? (
+              <button
+                type="button"
+                className="submission-delete-btn submission-delete-btn--admin-row"
+                onClick={onRequestDelete}
+              >
+                删除作品
+              </button>
+            ) : null}
+          </>
         )}
       </footer>
     </article>
@@ -141,6 +164,7 @@ export function ClassSubmissionsList({
   submissionsError,
 }: ClassSubmissionsListProps) {
   const { user } = useAuth()
+  const showAdminDelete = isClassSubmissionAdmin(user)
   const [items, setItems] = useState<
     { row: ClassSubmissionRecord; url: string }[]
   >([])
@@ -293,7 +317,7 @@ export function ClassSubmissionsList({
     setDeleteSubmitting(true)
     setDeleteActionError(null)
     try {
-      await deleteClassSubmission(deleteTarget.submissionId, user.studentId)
+      await deleteClassSubmission(deleteTarget.submissionId, user)
       setDeleteTarget(null)
       onListMutated?.()
     } catch (e) {
@@ -322,7 +346,11 @@ export function ClassSubmissionsList({
   }
 
   if (items.length === 0) {
-    return <p className="panel-empty">班级列表还是空的，先去上传一件作品吧。</p>
+    return (
+      <p className="panel-empty">
+        班级列表还是空的，请联系管理员上传作品。
+      </p>
+    )
   }
 
   return (
@@ -364,6 +392,7 @@ export function ClassSubmissionsList({
                 previewUrl={url}
                 isVoted={activeVoteId === row.submissionId}
                 isOwn={isOwnRow}
+                showAdminDelete={showAdminDelete}
                 voteBusy={voteSubmitting}
                 onVote={() => handleVoteClick(row)}
                 onRequestDelete={() => handleOpenDelete(row)}

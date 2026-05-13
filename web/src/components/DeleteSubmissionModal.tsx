@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { ClassSubmissionRecord } from '../types/classSubmission'
 import { submissionDisplayLabel } from '../lib/submissionDisplayTitle'
+import { submissionAuthorDisplayName } from '../lib/submissionAuthorDisplay'
 
 interface DeleteSubmissionModalProps {
   target: ClassSubmissionRecord
@@ -11,7 +12,7 @@ interface DeleteSubmissionModalProps {
 }
 
 /**
- * 删除本人作品前的阻断式确认对话框。
+ * 删除作品前的确认对话框（当前仅管理员可发起删除）。
  */
 export function DeleteSubmissionModal({
   target,
@@ -49,7 +50,7 @@ export function DeleteSubmissionModal({
           删除作品
         </h2>
         <p className="vote-modal-body">
-          {`确定要删除「${target.uploaderDisplayName}」的「${submissionDisplayLabel(
+          {`确定要删除「${submissionAuthorDisplayName(target)}」的「${submissionDisplayLabel(
             target,
           )}」吗？此操作不可恢复；若其他同学曾投票给该作品，相关选票将失效。`}
         </p>

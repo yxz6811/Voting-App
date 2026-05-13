@@ -11,9 +11,14 @@ export interface ClassSubmissionRecord {
   submissionId: string
   /** ISO-8601 创建时间，用于排序 */
   createdAt: string
-  /** 提交时的展示姓名快照 */
+  /** 列表/排行榜展示的作者名（管理员上传时与 `authorDisplayName` 一致，为表单所填） */
   uploaderDisplayName: string
-  /** 提交时的学号快照 */
+  /**
+   * 管理员上传时填写的作者展示名；有值时 {@link submissionAuthorDisplayName} 优先用此字段。
+   * 新提交与 `uploaderDisplayName` 通常相同。
+   */
+  authorDisplayName?: string
+  /** 实际上传操作者学号快照（管理员上传时为管理员学号） */
   uploaderStudentId: string
   /** 归一化后的 MIME（`File.type` 或扩展名推断） */
   mimeType: string

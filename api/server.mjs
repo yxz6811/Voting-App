@@ -247,6 +247,21 @@ app.get('/submissions', async (_req, res) => {
 })
 
 const MAX_DISPLAY_TITLE_LEN = 80
+/** 管理员上传：与前端 `classSubmissionAdmin.ts` 保持一致 */
+const ADMIN_UPLOADER_DISPLAY_NAME = 'yxz'
+const ADMIN_UPLOADER_STUDENT_ID = '6811'
+const MAX_AUTHOR_DISPLAY_LEN = 40
+
+/**
+ * @param {string} displayName
+ * @param {string} studentId
+ */
+function isAdminUploader(displayName, studentId) {
+  return (
+    displayName === ADMIN_UPLOADER_DISPLAY_NAME &&
+    studentId === ADMIN_UPLOADER_STUDENT_ID
+  )
+}
 
 app.post('/submissions', upload.single('file'), async (req, res) => {
   const id = req._submissionId
@@ -257,11 +272,15 @@ app.post('/submissions', upload.single('file'), async (req, res) => {
       }
       return res.status(400).json({ error: 'missing_file' })
     }
-    const uploaderDisplayName = String(req.body.uploaderDisplayName ?? '').trim()
-    const uploaderStudentId = String(req.body.uploaderStudentId ?? '').trim()
+    const operatorDisplayName = String(
+      req.body.operatorDisplayName ?? req.body.uploaderDisplayName ?? '',
+    ).trim()
+    const operatorStudentId = String(
+      req.body.operatorStudentId ?? req.body.uploaderStudentId ?? '',
+    ).trim()
     const displayTitle = String(req.body.displayTitle ?? '').trim()
     const mediaKind = req.body.mediaKind === 'video' ? 'video' : 'image'
-    if (!uploaderDisplayName || !uploaderStudentId || !displayTitle) {
+    if (!operatorDisplayName || !operatorStudentId || !displayTitle) {
       await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
       return res.status(400).json({ error: 'missing_fields' })
     }
@@ -269,11 +288,26 @@ app.post('/submissions', upload.single('file'), async (req, res) => {
       await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
       return res.status(400).json({ error: 'display_title_too_long' })
     }
+    if (!isAdminUploader(operatorDisplayName, operatorStudentId)) {
+      await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
+      return res.status(403).json({ error: 'upload_forbidden' })
+    }
+    const authorDisplayName = String(req.body.authorDisplayName ?? '').trim()
+    if (!authorDisplayName) {
+      await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
+      return res.status(400).json({ error: 'missing_author' })
+    }
+    if (authorDisplayName.length > MAX_AUTHOR_DISPLAY_LEN) {
+      await fs.rm(path.join(DATA_ROOT, id), { recursive: true, force: true })
+      return res.status(400).json({ error: 'author_display_too_long' })
+    }
+    /** 列表/排行榜展示的作者名；学号为实际上传操作者（管理员） */
     const meta = {
       submissionId: id,
       createdAt: new Date().toISOString(),
-      uploaderDisplayName,
-      uploaderStudentId,
+      uploaderDisplayName: authorDisplayName,
+      uploaderStudentId: operatorStudentId,
+      authorDisplayName,
       displayTitle,
       mimeType: req.file.mimetype || 'application/octet-stream',
       originalFileName: req.file.originalname || 'upload',
@@ -321,20 +355,23 @@ app.delete('/submissions/:id', async (req, res) => {
     if (!UUID_RE.test(id)) {
       return res.status(400).json({ error: 'invalid_id' })
     }
-    const uploaderStudentId = String(req.body?.uploaderStudentId ?? '').trim()
-    if (!uploaderStudentId) {
-      return res.status(400).json({ error: 'missing_uploader_student_id' })
+    const operatorDisplayName = String(
+      req.body?.operatorDisplayName ?? req.body?.uploaderDisplayName ?? '',
+    ).trim()
+    const operatorStudentId = String(
+      req.body?.operatorStudentId ?? req.body?.uploaderStudentId ?? '',
+    ).trim()
+    if (!operatorDisplayName || !operatorStudentId) {
+      return res.status(400).json({ error: 'missing_operator' })
+    }
+    if (!isAdminUploader(operatorDisplayName, operatorStudentId)) {
+      return res.status(403).json({ error: 'forbidden_not_admin' })
     }
     const base = path.join(DATA_ROOT, id)
-    let meta
     try {
-      const raw = await fs.readFile(path.join(base, 'meta.json'), 'utf8')
-      meta = JSON.parse(raw)
+      await fs.readFile(path.join(base, 'meta.json'), 'utf8')
     } catch {
       return res.status(404).json({ error: 'not_found' })
-    }
-    if (String(meta.uploaderStudentId ?? '').trim() !== uploaderStudentId) {
-      return res.status(403).json({ error: 'forbidden_not_owner' })
     }
     await fs.rm(base, { recursive: true, force: true })
     await removeVotesForSubmission(id)

@@ -1,4 +1,5 @@
 import type { ClassSubmissionRecord } from '../types/classSubmission'
+import type { CurrentUser } from '../types/currentUser'
 import { getSubmissionsApiBase } from './submissionsApiBase'
 
 interface SubmissionMetaJson {
@@ -11,6 +12,7 @@ interface SubmissionMetaJson {
   byteSize: number
   mediaKind: 'image' | 'video'
   displayTitle?: string
+  authorDisplayName?: string
   voteCount?: number
 }
 
@@ -36,6 +38,10 @@ export async function listSubmissionsDesc(): Promise<ClassSubmissionRecord[]> {
     displayTitle:
       typeof m.displayTitle === 'string' && m.displayTitle.trim() !== ''
         ? m.displayTitle.trim()
+        : undefined,
+    authorDisplayName:
+      typeof m.authorDisplayName === 'string' && m.authorDisplayName.trim() !== ''
+        ? m.authorDisplayName.trim()
         : undefined,
     byteSize: m.byteSize,
     mediaKind: m.mediaKind,
@@ -134,15 +140,15 @@ function mapCastVoteMessage(status: number, errorCode: string): string {
 }
 
 /**
- * 删除服务端一条班级作品（仅当 `uploaderStudentId` 与作品 meta 中作者学号一致时成功）。
+ * 删除服务端一条班级作品（仅管理员可删任意条目；请求体须携带操作者姓名与学号）。
  *
  * @param submissionId 作品 `submissionId`（UUID）
- * @param uploaderStudentId 当前操作者学号，须与作品作者一致
+ * @param actor 当前登录用户，须为管理员账号
  * @throws {Error} 非 2xx 或网络失败时抛出；HTTP 错误对象可附带 `status`、`errorCode` 字符串字段
  */
 export async function deleteClassSubmission(
   submissionId: string,
-  uploaderStudentId: string,
+  actor: CurrentUser,
 ): Promise<void> {
   const base = getSubmissionsApiBase()
   let res: Response
@@ -150,7 +156,10 @@ export async function deleteClassSubmission(
     res = await fetch(`${base}/submissions/${encodeURIComponent(submissionId)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uploaderStudentId }),
+      body: JSON.stringify({
+        operatorDisplayName: actor.displayName,
+        operatorStudentId: actor.studentId,
+      }),
     })
   } catch (e) {
     const err = new Error('网络异常，无法连接服务器。')
@@ -185,13 +194,20 @@ export async function deleteClassSubmission(
  * @param errorCode 服务端 `error` 字段或回退码
  */
 function mapDeleteSubmissionMessage(status: number, errorCode: string): string {
+  if (errorCode === 'forbidden_not_admin') {
+    return '无权删除该作品（仅管理员可删）。'
+  }
   if (errorCode === 'forbidden_not_owner') {
     return '无权删除该作品（仅作者本人可删）。'
   }
   if (errorCode === 'not_found') {
     return '该作品不存在或已被删除。'
   }
-  if (errorCode === 'missing_uploader_student_id' || errorCode === 'invalid_id') {
+  if (
+    errorCode === 'missing_operator' ||
+    errorCode === 'missing_uploader_student_id' ||
+    errorCode === 'invalid_id'
+  ) {
     return '删除请求无效，请重新登录后重试。'
   }
   if (status >= 500) {

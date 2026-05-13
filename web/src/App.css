@@ -188,32 +188,107 @@
   gap: 0.45rem;
 }
 
-.vote-leaderboard-row {
+.vote-leaderboard-row-inner {
   display: grid;
-  grid-template-columns: 2.1rem minmax(0, 1fr) auto;
-  gap: 0.35rem 0.5rem;
-  align-items: baseline;
+  grid-template-columns: 2.75rem minmax(0, 0.95fr) minmax(0, 1.05fr) auto;
+  gap: 0.35rem 0.45rem;
+  align-items: center;
   font-size: 0.9rem;
   color: var(--text-h);
 }
 
-.vote-leaderboard-rank {
-  font-weight: 700;
-  color: var(--accent);
-  text-align: right;
+.vote-leaderboard-cell--rank {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.vote-leaderboard-name {
+.vote-leaderboard-rank-plain {
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  min-width: 1.5rem;
+}
+
+.vote-leaderboard-crown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.vote-leaderboard-crown-svg {
+  display: block;
+}
+
+.vote-leaderboard-crown-top {
+  stroke: rgba(0, 0, 0, 0.22);
+  stroke-width: 0.6;
+}
+
+.vote-leaderboard-crown-band {
+  stroke: rgba(0, 0, 0, 0.18);
+  stroke-width: 0.4;
+}
+
+.vote-leaderboard-crown-digit {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
+}
+
+.vote-leaderboard-crown--gold .vote-leaderboard-crown-top {
+  fill: #f2c14e;
+  filter: drop-shadow(0 1px 0 rgba(120, 80, 0, 0.45));
+}
+
+.vote-leaderboard-crown--gold .vote-leaderboard-crown-band {
+  fill: #b8860b;
+}
+
+.vote-leaderboard-crown--gold .vote-leaderboard-crown-digit {
+  fill: #3d2808;
+}
+
+.vote-leaderboard-crown--silver .vote-leaderboard-crown-top {
+  fill: #d8dce3;
+  filter: drop-shadow(0 1px 0 rgba(60, 70, 90, 0.35));
+}
+
+.vote-leaderboard-crown--silver .vote-leaderboard-crown-band {
+  fill: #8b939e;
+}
+
+.vote-leaderboard-crown--silver .vote-leaderboard-crown-digit {
+  fill: #1e2430;
+}
+
+.vote-leaderboard-crown--bronze .vote-leaderboard-crown-top {
+  fill: #c4956a;
+  filter: drop-shadow(0 1px 0 rgba(80, 50, 20, 0.4));
+}
+
+.vote-leaderboard-crown--bronze .vote-leaderboard-crown-band {
+  fill: #8b5a2b;
+}
+
+.vote-leaderboard-crown--bronze .vote-leaderboard-crown-digit {
+  fill: #2a1a0c;
+}
+
+.vote-leaderboard-cell--author,
+.vote-leaderboard-cell--title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.vote-leaderboard-count {
+.vote-leaderboard-cell--votes {
   font-weight: 600;
   color: var(--accent);
   white-space: nowrap;
+  text-align: right;
 }
 
 @media (max-width: 720px) {
@@ -384,6 +459,14 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.submission-vote-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .vote-button {

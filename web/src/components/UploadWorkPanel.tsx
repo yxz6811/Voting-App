@@ -2,6 +2,9 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../auth'
 import { submitClassSubmission } from '../lib/submitClassSubmission'
 import { SUBMISSION_DISPLAY_TITLE_MAX_LEN } from '../lib/submissionDisplayTitle'
+import {
+  SUBMISSION_AUTHOR_DISPLAY_MAX_LEN,
+} from '../lib/submissionAuthorDisplay'
 
 const FILE_ACCEPT =
   'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,.jpg,.jpeg,.png,.webp,.gif,.mp4,.webm'
@@ -12,12 +15,13 @@ interface UploadWorkPanelProps {
 }
 
 /**
- * 上传作品：填写作品名、选择文件，校验后提交到班级作品服务器。
+ * 管理员上传作品：填写作品名、作者名，选择文件后提交到班级作品服务器。
  */
 export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
   const { user } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [displayTitle, setDisplayTitle] = useState('')
+  const [authorDisplayName, setAuthorDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -35,13 +39,19 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
     }
     setError(null)
     setBusy(true)
-    const result = await submitClassSubmission(user, file, displayTitle)
+    const result = await submitClassSubmission(
+      user,
+      file,
+      displayTitle,
+      authorDisplayName,
+    )
     setBusy(false)
     if (!result.ok) {
       setError(result.message)
       return
     }
     setDisplayTitle('')
+    setAuthorDisplayName('')
     onSubmitted()
   }
 
@@ -65,6 +75,23 @@ export function UploadWorkPanel({ onSubmitted }: UploadWorkPanelProps) {
       </div>
       <p className="panel-note">
         作品名最多 {SUBMISSION_DISPLAY_TITLE_MAX_LEN} 字；将显示在列表中「图片 / 视频 · …」的位置，避免文件名乱码。
+      </p>
+      <div className="auth-field upload-title-field">
+        <label htmlFor="submission-author-display-name">作者名</label>
+        <input
+          id="submission-author-display-name"
+          type="text"
+          maxLength={SUBMISSION_AUTHOR_DISPLAY_MAX_LEN}
+          autoComplete="off"
+          placeholder="排行榜与列表中展示的作者名"
+          value={authorDisplayName}
+          disabled={!canUpload || busy}
+          onChange={(e) => setAuthorDisplayName(e.target.value)}
+        />
+      </div>
+      <p className="panel-note">
+        作者名最多 {SUBMISSION_AUTHOR_DISPLAY_MAX_LEN}
+        字；列表与排行榜中的作者均以此为准；学号在后台记录为管理员账号，仅管理员可删除作品。
       </p>
       <input
         ref={inputRef}
