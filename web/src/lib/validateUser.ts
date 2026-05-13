@@ -1,8 +1,8 @@
-import { ADMIN_STUDENT_ID, TEACHER_STUDENT_ID } from './classSubmissionAdmin'
+import { ADMIN_STUDENT_ID, GUEST_TEACHER_STUDENT_ID, TEACHER_STUDENT_ID } from './classSubmissionAdmin'
 
 /**
  * 学号：本班固定为十进制数字 **1–50**（无 **38** 号位，与名单一致），不允许前导零；
- * 另允许管理员学号 **6811**、教师学号 **708**（与 `classSubmissionAdmin` 中常量一致）。
+ * 另允许管理员学号 **6811**、教师学号 **708**、访客 **123**（与 `classSubmissionAdmin` 中常量一致）。
  */
 const STUDENT_ID_PATTERN = /^(?:[1-9]|[1-4][0-9]|50)$/
 
@@ -38,7 +38,7 @@ export function validateDisplayName(
 }
 
 /**
- * 校验学号：trim 后须为 **1–50** 的正整数（无前导零），或 **6811** / **708**。
+ * 校验学号：trim 后须为 **1–50** 的正整数（无前导零），或 **6811** / **708** / **123**。
  *
  * @param raw 用户输入
  * @returns 成功时返回 trim 后的学号；失败时返回错误文案（对非法输入仍为 1–50 提示）
@@ -52,13 +52,17 @@ export function validateStudentId(
   if (value.length === 0) {
     return { ok: false, message: '学号不能为空' }
   }
-  if (value === ADMIN_STUDENT_ID || value === TEACHER_STUDENT_ID) {
+  if (
+    value === ADMIN_STUDENT_ID ||
+    value === TEACHER_STUDENT_ID ||
+    value === GUEST_TEACHER_STUDENT_ID
+  ) {
     return { ok: true, value }
   }
   if (!STUDENT_ID_PATTERN.test(value)) {
     return {
       ok: false,
-      message: '学号须为 1 到 50（不含前导零）、6811 或 708',
+      message: '学号须为 1 到 50（不含前导零）、6811、708 或 123',
     }
   }
   return { ok: true, value }

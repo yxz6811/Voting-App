@@ -10,6 +10,9 @@ export const ADMIN_STUDENT_ID = '6811'
 export const TEACHER_DISPLAY_NAME = 'teacher'
 export const TEACHER_STUDENT_ID = '708'
 
+/** 访客「许老师」学号（与 `number.md` 一致），可登录投票，非作品上传管理员 */
+export const GUEST_TEACHER_STUDENT_ID = '123'
+
 /**
  * 判断当前用户是否为班级作品上传管理员。
  *
