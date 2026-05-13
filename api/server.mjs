@@ -5,10 +5,12 @@
  * 环境变量：
  * - `VOTING_DATA_DIR`：数据根目录（默认 `./data`）
  * - `PORT`：监听端口（默认 `3040`）
+ * - 反馈邮件（QQ SMTP）：`VOTING_FEEDBACK_SMTP_PASS`（必填，为邮箱 SMTP 授权码，勿提交到仓库）、`VOTING_FEEDBACK_SMTP_USER`（发件账号，默认与收件邮箱一致）、`VOTING_FEEDBACK_TO_EMAIL`（收件，默认 `3978401510@qq.com`）、`VOTING_FEEDBACK_SMTP_HOST`（默认 `smtp.qq.com`）、`VOTING_FEEDBACK_SMTP_PORT`（默认 `465`）
  */
 import cors from 'cors'
 import express from 'express'
 import multer from 'multer'
+import nodemailer from 'nodemailer'
 import fs from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -280,11 +282,135 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: MAX_BYTES } })
 
 const app = express()
+app.set('trust proxy', 1)
 app.use(cors())
 app.use(express.json({ limit: '1mb' }))
 
+/** @type {import('nodemailer').Transporter | null} */
+let feedbackTransporter = null
+
+const FEEDBACK_DEFAULT_TO = '3978401510@qq.com'
+const FEEDBACK_RATELIMIT_WINDOW_MS = 60 * 60 * 1000
+const FEEDBACK_RATELIMIT_MAX = 8
+/** @type {Map<string, { count: number; resetAt: number }>} */
+const feedbackRateByIp = new Map()
+
+/**
+ * @param {string} ip
+ * @returns {boolean}
+ */
+function feedbackRateAllow(ip) {
+  const now = Date.now()
+  let rec = feedbackRateByIp.get(ip)
+  if (!rec || now > rec.resetAt) {
+    rec = { count: 0, resetAt: now + FEEDBACK_RATELIMIT_WINDOW_MS }
+    feedbackRateByIp.set(ip, rec)
+  }
+  if (rec.count >= FEEDBACK_RATELIMIT_MAX) {
+    return false
+  }
+  rec.count += 1
+  return true
+}
+
+/**
+ * @returns {import('nodemailer').Transporter | null}
+ */
+function getFeedbackTransporter() {
+  const pass = String(process.env.VOTING_FEEDBACK_SMTP_PASS ?? '').trim()
+  if (!pass) {
+    return null
+  }
+  if (feedbackTransporter) {
+    return feedbackTransporter
+  }
+  const toDefault = (process.env.VOTING_FEEDBACK_TO_EMAIL || FEEDBACK_DEFAULT_TO).trim()
+  const user = String(
+    process.env.VOTING_FEEDBACK_SMTP_USER?.trim() || toDefault,
+  ).trim()
+  const host = String(process.env.VOTING_FEEDBACK_SMTP_HOST ?? 'smtp.qq.com').trim()
+  const port = Number(process.env.VOTING_FEEDBACK_SMTP_PORT || 465)
+  const secureRaw = process.env.VOTING_FEEDBACK_SMTP_SECURE
+  const secure =
+    secureRaw === undefined || secureRaw === '' || secureRaw === '1' || secureRaw === 'true'
+  feedbackTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  })
+  return feedbackTransporter
+}
+
+/**
+ * @param {import('express').Request} req
+ * @returns {string}
+ */
+function clientIp(req) {
+  const xf = String(req.headers['x-forwarded-for'] ?? '')
+  const first = xf.split(',')[0].trim()
+  if (first) {
+    return first
+  }
+  return String(req.socket.remoteAddress ?? 'unknown')
+}
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
+})
+
+app.post('/feedback', async (req, res) => {
+  try {
+    const ip = clientIp(req)
+    if (!feedbackRateAllow(ip)) {
+      return res.status(429).json({ error: 'feedback_rate_limited' })
+    }
+    const userStudentId = String(req.body?.userStudentId ?? '').trim()
+    const userDisplayName = String(req.body?.userDisplayName ?? '').trim()
+    const message = String(req.body?.message ?? '').trim()
+    const contact = String(req.body?.contact ?? '').trim()
+    if (!userStudentId || !userDisplayName) {
+      return res.status(400).json({ error: 'missing_identity' })
+    }
+    if (!isAllowedLoginPair(userStudentId, userDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
+    }
+    if (message.length < 10 || message.length > 4000) {
+      return res.status(400).json({ error: 'invalid_message' })
+    }
+    if (contact.length > 200) {
+      return res.status(400).json({ error: 'contact_too_long' })
+    }
+    const transport = getFeedbackTransporter()
+    if (!transport) {
+      return res.status(503).json({ error: 'feedback_smtp_not_configured' })
+    }
+    const to = (process.env.VOTING_FEEDBACK_TO_EMAIL || FEEDBACK_DEFAULT_TO).trim()
+    const fromAddr = String(
+      process.env.VOTING_FEEDBACK_SMTP_USER?.trim() || to,
+    ).trim()
+    const subject = `[投票小程序] 反馈 — ${userDisplayName}（学号 ${userStudentId}）`
+    const text = [
+      `提交者：${userDisplayName}（学号 ${userStudentId}）`,
+      contact ? `其它联系方式：${contact}` : '其它联系方式：（未填）',
+      '',
+      '--- 留言 ---',
+      message,
+      '',
+      `客户端 IP：${ip}`,
+    ].join('\n')
+    await transport.sendMail({
+      from: `"投票小程序" <${fromAddr}>`,
+      to,
+      replyTo: fromAddr,
+      subject,
+      text,
+    })
+    return res.status(204).send()
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'feedback_send_failed' })
+  }
 })
 
 app.get('/votes/by-voter', async (req, res) => {

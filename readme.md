@@ -22,6 +22,15 @@ cd web && npm run build && rsync -avz --delete -e "ssh -p 41326" ./dist/ root@19
 
 API 由 Nginx 反代 `/voting-app-api/`，改 `api/server.mjs` 时需在服务器上单独更新 Node 进程与数据目录，**不要**改其他站点的 Nginx 配置。
 
+首次拉取含「反馈发信」的代码后，在服务器 API 目录执行一次 **`npm install`**（会安装 `nodemailer`）。反馈邮件依赖环境变量（**不要把 QQ 邮箱 SMTP 授权码写进仓库或前端**，只在服务器上配置）：
+
+- **`VOTING_FEEDBACK_SMTP_PASS`**（必填）：QQ 邮箱设置里生成的 SMTP 授权码。
+- **`VOTING_FEEDBACK_TO_EMAIL`**（可选）：收件邮箱，默认 `3978401510@qq.com`。
+- **`VOTING_FEEDBACK_SMTP_USER`**（可选）：发件登录账号，一般与 QQ 邮箱地址一致；默认与收件邮箱一致。
+- **`VOTING_FEEDBACK_SMTP_HOST` / `VOTING_FEEDBACK_SMTP_PORT`**（可选）：默认 `smtp.qq.com` 与 `465`。
+
+未配置 `VOTING_FEEDBACK_SMTP_PASS` 时，前端可打开留言板，但提交会提示「尚未在服务器上配置发信」。
+
 cd "/Users/yxz/Desktop/projects/投票小程序/web" && npm run build
 
 cd "/Users/yxz/Desktop/projects/投票小程序/web/dist" && COPYFILE_DISABLE=1 tar cf - . | ssh -p 41326 -o BatchMode=yes root@193.134.211.194 'rm -rf /var/www/voting-app/* && tar xf - -C /var/www/voting-app'
