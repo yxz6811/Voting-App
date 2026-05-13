@@ -17,11 +17,18 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="app-brand">投票小程序</span>
+        <div className="app-brand-wrap">
+          <span className="app-brand-dot" aria-hidden="true" />
+          <div className="app-brand-copy">
+            <span className="app-brand">投票小程序</span>
+            <span className="app-brand-sub">Class Gallery Voting</span>
+          </div>
+        </div>
         <div className="app-header-user">
-          <span className="app-user-name" title={user.studentId}>
-            {user.displayName}
-          </span>
+          <div className="app-user-chip" title={user.studentId}>
+            <span className="app-user-label">当前用户</span>
+            <span className="app-user-name">{user.displayName}</span>
+          </div>
           <button type="button" className="auth-logout" onClick={logout}>
             登出
           </button>

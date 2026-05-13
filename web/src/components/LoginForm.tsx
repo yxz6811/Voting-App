@@ -20,42 +20,53 @@ export function LoginForm() {
   }
 
   return (
-    <div className="auth-card">
-      <h1 className="auth-title">登录</h1>
-      <p className="auth-sub">
-        请输入姓名与学号（学号为本班 1–50 号）以继续使用投票小程序
-      </p>
-      <form className="auth-form" onSubmit={handleSubmit}>
-        {error != null ? (
-          <div className="auth-error" role="alert">
-            {error}
-          </div>
-        ) : null}
-        <label className="auth-field">
-          <span>姓名</span>
-          <input
-            name="displayName"
-            autoComplete="name"
-            value={displayName}
-            onChange={(ev) => setDisplayName(ev.target.value)}
-            placeholder="例如：张三"
-          />
-        </label>
-        <label className="auth-field">
-          <span>学号</span>
-          <input
-            name="studentId"
-            inputMode="numeric"
-            autoComplete="username"
-            value={studentId}
-            onChange={(ev) => setStudentId(ev.target.value)}
-            placeholder="请输入 1–50，如 7、38"
-          />
-        </label>
-        <button type="submit" className="auth-submit">
-          登录
-        </button>
-      </form>
+    <div className="auth-page">
+      <div className="auth-card">
+        <p className="auth-kicker">Class Vote Studio</p>
+        <h1 className="auth-title">班级作品投票</h1>
+        <p className="auth-sub">
+          请输入姓名与学号（学号为本班 1–50 号）后即可查看作品并参与投票
+        </p>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          {error != null ? (
+            <div className="auth-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <label className="auth-field">
+            <span>姓名</span>
+            <input
+              name="displayName"
+              autoComplete="name"
+              value={displayName}
+              onChange={(ev) => setDisplayName(ev.target.value)}
+              placeholder="例如：张三"
+            />
+          </label>
+          <label className="auth-field">
+            <span>学号</span>
+            <input
+              name="studentId"
+              inputMode="numeric"
+              autoComplete="username"
+              value={studentId}
+              onChange={(ev) => setStudentId(ev.target.value)}
+              placeholder="请输入 1–50，如 7、38"
+            />
+          </label>
+          <button type="submit" className="auth-submit">
+            进入班级
+          </button>
+        </form>
+      </div>
+      <aside className="auth-glance" aria-hidden="true">
+        <p className="auth-glance-title">今天做什么</p>
+        <ol className="auth-glance-list">
+          <li>浏览班级作品</li>
+          <li>支持你喜欢的同学</li>
+          <li>关注实时排行榜</li>
+        </ol>
+      </aside>
     </div>
   )
 }

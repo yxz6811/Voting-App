@@ -36,11 +36,37 @@ function mediaKindLabel(kind: SubmissionMediaKind): string {
   return kind === 'image' ? '图片' : '视频'
 }
 
+type SubmissionTierTone = 's' | 'a' | 'b' | 'c'
+
+interface SubmissionTier {
+  label: string
+  tone: SubmissionTierTone
+  tip: string
+}
+
+function submissionTierByVotes(voteCount: number, maxVoteCount: number): SubmissionTier {
+  if (maxVoteCount <= 0) {
+    return { label: '新秀 C 档', tone: 'c', tip: '刚上榜，欢迎第一票支持。' }
+  }
+  const ratio = voteCount / maxVoteCount
+  if (ratio >= 0.85) {
+    return { label: '爆款 S 档', tone: 's', tip: '当前是头部作品，热度很高。' }
+  }
+  if (ratio >= 0.6) {
+    return { label: '热门 A 档', tone: 'a', tip: '表现稳定，继续冲榜很有机会。' }
+  }
+  if (ratio >= 0.35) {
+    return { label: '潜力 B 档', tone: 'b', tip: '上升势头不错，再加几票更容易进前列。' }
+  }
+  return { label: '新秀 C 档', tone: 'c', tip: '还在起步阶段，欢迎多多支持。' }
+}
+
 interface SubmissionRowProps {
   row: ClassSubmissionRecord
   previewUrl: string
   isVoted: boolean
   isOwn: boolean
+  tier: SubmissionTier
   /** 管理员在所有条目上显示删除 */
   showAdminDelete: boolean
   /** 正在提交投票，禁用「投票」防重复 */
@@ -60,6 +86,7 @@ function SubmissionRow({
   previewUrl,
   isVoted,
   isOwn,
+  tier,
   showAdminDelete,
   voteBusy,
   onVote,
@@ -75,7 +102,15 @@ function SubmissionRow({
   return (
     <article className={cardClass}>
       <header className="submission-card-head">
-        <span className="submission-author">{authorShown}</span>
+        <div className="submission-author-row">
+          <span className="submission-author">{authorShown}</span>
+          <span
+            className={`submission-tier submission-tier--${tier.tone}`}
+            title={tier.tip}
+          >
+            {tier.label}
+          </span>
+        </div>
         <span className="submission-meta">
           {mediaKindLabel(row.mediaKind)} · {titleShown}
           <span className="submission-vote-count" aria-label={`得票 ${row.voteCount} 票`}>
@@ -150,6 +185,11 @@ function SubmissionRow({
                 </button>
               )}
             </div>
+            <p className="submission-ux-tip">
+              {isVoted
+                ? '已支持该作品，可在排行榜关注名次变化。'
+                : '喜欢就投一票，票数会实时计入排行榜。'}
+            </p>
             {showAdminDelete ? (
               <button
                 type="button"
@@ -191,6 +231,11 @@ export function ClassSubmissionsList({
   const [deleteActionError, setDeleteActionError] = useState<string | null>(null)
   const [voteActionError, setVoteActionError] = useState<string | null>(null)
   const [voteSubmitting, setVoteSubmitting] = useState(false)
+  const maxVoteCount = submissions.reduce(
+    (max, row) => Math.max(max, row.voteCount),
+    0,
+  )
+  const remainingVotes = Math.max(VOTES_PER_USER - votedSubmissionIds.length, 0)
 
   useEffect(() => {
     if (submissionsLoading || submissionsError != null) {
@@ -395,6 +440,9 @@ export function ClassSubmissionsList({
           {voteActionError}
         </div>
       ) : null}
+      <p className="vote-progress-note" aria-live="polite">
+        你还可以投 <strong>{remainingVotes}</strong> / {VOTES_PER_USER} 票
+      </p>
       <ul className="submission-list">
         {items.map(({ row, url }) => {
           const isOwnRow =
@@ -406,6 +454,7 @@ export function ClassSubmissionsList({
                 previewUrl={url}
                 isVoted={votedSubmissionIds.includes(row.submissionId)}
                 isOwn={isOwnRow}
+                tier={submissionTierByVotes(row.voteCount, maxVoteCount)}
                 showAdminDelete={showAdminDelete}
                 voteBusy={voteSubmitting}
                 onVote={() => handleVoteClick(row)}

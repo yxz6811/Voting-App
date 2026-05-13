@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ClassSubmissionRecord } from '../types/classSubmission'
 import { listSubmissionsDesc } from '../lib/submissionsDb'
+import { VOTES_PER_USER } from '../lib/voteStorage'
 import { ClassSubmissionsList } from './ClassSubmissionsList'
 import { UploadWorkPanel } from './UploadWorkPanel'
 import { VoteLeaderboardPanel } from './VoteLeaderboardPanel'
@@ -70,6 +71,25 @@ export function LoggedInClassroom() {
 
   return (
     <div className="classroom">
+      <section className="classroom-hero" aria-label="班级作品区介绍">
+        <div>
+          <p className="classroom-kicker">Classroom Gallery</p>
+          <h1 className="classroom-title">班级作品展示墙</h1>
+          <p className="classroom-desc">
+            上传优秀作品，给喜欢的内容投票，排行榜将按票数实时更新。
+          </p>
+        </div>
+        <div className="classroom-stats" aria-hidden="true">
+          <div className="classroom-stat">
+            <span className="classroom-stat-key">当前作品</span>
+            <span className="classroom-stat-value">{listRows.length}</span>
+          </div>
+          <div className="classroom-stat">
+            <span className="classroom-stat-key">每人可投</span>
+            <span className="classroom-stat-value">{VOTES_PER_USER} 票</span>
+          </div>
+        </div>
+      </section>
       {isAdmin ? (
         <nav className="classroom-nav" aria-label="班级功能">
           <button
@@ -90,15 +110,17 @@ export function LoggedInClassroom() {
       ) : null}
       <section className="classroom-body" aria-live="polite">
         {tab === 'upload' ? (
-          <UploadWorkPanel
-            onSubmitted={() => {
-              bumpList()
-              goListTab()
-            }}
-          />
+          <div className="classroom-pane classroom-pane--upload">
+            <UploadWorkPanel
+              onSubmitted={() => {
+                bumpList()
+                goListTab()
+              }}
+            />
+          </div>
         ) : (
           <div className="classroom-list-with-leaderboard">
-            <div className="classroom-list-main">
+            <div className="classroom-list-main classroom-pane">
               <ClassSubmissionsList
                 refreshKey={listRefreshKey}
                 onListMutated={bumpList}
