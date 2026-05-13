@@ -1,23 +1,23 @@
 import { useEffect } from 'react'
 import type { ClassSubmissionRecord } from '../types/classSubmission'
 
-interface VoteChangeModalProps {
+interface DeleteSubmissionModalProps {
   target: ClassSubmissionRecord
-  /** 正在请求改投 */
-  submitting?: boolean
+  /** 是否正在请求删除（禁用按钮防重复） */
+  submitting: boolean
   onCancel: () => void
   onConfirm: () => void
 }
 
 /**
- * 改投确认：阻断式对话框，说明将取消原投票。
+ * 删除本人作品前的阻断式确认对话框。
  */
-export function VoteChangeModal({
+export function DeleteSubmissionModal({
   target,
-  submitting = false,
+  submitting,
   onCancel,
   onConfirm,
-}: VoteChangeModalProps) {
+}: DeleteSubmissionModalProps) {
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
       if (ev.key === 'Escape' && !submitting) {
@@ -42,14 +42,13 @@ export function VoteChangeModal({
         className="vote-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="vote-change-title"
+        aria-labelledby="delete-submission-title"
       >
-        <h2 id="vote-change-title" className="vote-modal-title">
-          更改投票
+        <h2 id="delete-submission-title" className="vote-modal-title">
+          删除作品
         </h2>
         <p className="vote-modal-body">
-          您已投票给其他作品。若继续，将<strong>取消原先的投票</strong>
-          ，并改投给「{target.uploaderDisplayName}」的这件作品。是否确认？
+          确定要删除「{target.uploaderDisplayName}」的「{target.originalFileName}」吗？此操作不可恢复；若其他同学曾投票给该作品，相关选票将失效。
         </p>
         <div className="vote-modal-actions">
           <button
@@ -62,11 +61,11 @@ export function VoteChangeModal({
           </button>
           <button
             type="button"
-            className="auth-submit"
+            className="submission-delete-confirm"
             disabled={submitting}
             onClick={onConfirm}
           >
-            {submitting ? '提交中…' : '确认改投'}
+            {submitting ? '删除中…' : '确认删除'}
           </button>
         </div>
       </div>

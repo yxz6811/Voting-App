@@ -42,7 +42,10 @@ export function LoggedInClassroom() {
             }}
           />
         ) : (
-          <ClassSubmissionsList refreshKey={listRefreshKey} />
+          <ClassSubmissionsList
+            refreshKey={listRefreshKey}
+            onListMutated={bumpList}
+          />
         )}
       </section>
     </div>

@@ -1,5 +1,6 @@
 /**
  * 班级作品集中存储 API：磁盘目录 + meta.json，供所有浏览器/账号共享列表。
+ * 投票：`votes.json`（voterStudentId → votedSubmissionId），原子写入。
  *
  * 环境变量：
  * - `VOTING_DATA_DIR`：数据根目录（默认 `./data`）
@@ -22,7 +23,103 @@ const MAX_BYTES = 170 * 1024 * 1024
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+const VOTES_FILE = path.join(DATA_ROOT, 'votes.json')
+
 await fs.mkdir(DATA_ROOT, { recursive: true })
+
+/**
+ * @returns {Promise<Record<string, string>>}
+ */
+async function readVoteMap() {
+  try {
+    const raw = await fs.readFile(VOTES_FILE, 'utf8')
+    const o = JSON.parse(raw)
+    if (typeof o !== 'object' || o === null || Array.isArray(o)) {
+      return {}
+    }
+    /** @type {Record<string, string>} */
+    const out = {}
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof k === 'string' && typeof v === 'string' && k.trim() && v.trim()) {
+        out[k.trim()] = v.trim()
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * @param {Record<string, string>} map
+ */
+async function writeVoteMapAtomic(map) {
+  const tmp = path.join(DATA_ROOT, `votes.${randomUUID()}.tmp.json`)
+  await fs.writeFile(tmp, JSON.stringify(map, null, 0), 'utf8')
+  await fs.rename(tmp, VOTES_FILE)
+}
+
+/**
+ * @param {string} submissionId
+ */
+async function submissionMetaExists(submissionId) {
+  if (!UUID_RE.test(submissionId)) {
+    return false
+  }
+  try {
+    await fs.access(path.join(DATA_ROOT, submissionId, 'meta.json'))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * @param {Record<string, string>} map
+ * @param {Set<string>} validSubmissionIds
+ * @returns {boolean} 是否写回磁盘
+ */
+function pruneVotesNotInList(map, validSubmissionIds) {
+  let changed = false
+  for (const [voter, sid] of Object.entries(map)) {
+    if (!validSubmissionIds.has(sid)) {
+      delete map[voter]
+      changed = true
+    }
+  }
+  return changed
+}
+
+/**
+ * @param {Record<string, string>} map
+ * @returns {Map<string, number>}
+ */
+function tallyVotes(map) {
+  const counts = new Map()
+  for (const sid of Object.values(map)) {
+    counts.set(sid, (counts.get(sid) ?? 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * 删除所有指向某作品的选票。
+ *
+ * @param {string} submissionId
+ */
+async function removeVotesForSubmission(submissionId) {
+  const map = await readVoteMap()
+  let changed = false
+  for (const [voter, sid] of Object.entries(map)) {
+    if (sid === submissionId) {
+      delete map[voter]
+      changed = true
+    }
+  }
+  if (changed) {
+    await writeVoteMapAtomic(map)
+  }
+}
 
 const storage = multer.diskStorage({
   destination: async (req, _file, cb) => {
@@ -52,10 +149,64 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+app.get('/votes/by-voter', async (req, res) => {
+  try {
+    const voterStudentId = String(req.query.voterStudentId ?? '').trim()
+    if (!voterStudentId) {
+      return res.status(400).json({ error: 'missing_voter' })
+    }
+    const map = await readVoteMap()
+    const sid = map[voterStudentId]
+    if (sid == null || sid === '') {
+      return res.json({ votedSubmissionId: null })
+    }
+    if (!(await submissionMetaExists(sid))) {
+      delete map[voterStudentId]
+      await writeVoteMapAtomic(map)
+      return res.json({ votedSubmissionId: null })
+    }
+    return res.json({ votedSubmissionId: sid })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'vote_read_failed' })
+  }
+})
+
+app.put('/votes', async (req, res) => {
+  try {
+    const voterStudentId = String(req.body?.voterStudentId ?? '').trim()
+    const votedSubmissionId = String(req.body?.votedSubmissionId ?? '').trim()
+    if (!voterStudentId || !votedSubmissionId) {
+      return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!UUID_RE.test(votedSubmissionId)) {
+      return res.status(400).json({ error: 'invalid_submission_id' })
+    }
+    const base = path.join(DATA_ROOT, votedSubmissionId)
+    let meta
+    try {
+      meta = JSON.parse(await fs.readFile(path.join(base, 'meta.json'), 'utf8'))
+    } catch {
+      return res.status(404).json({ error: 'submission_not_found' })
+    }
+    if (String(meta.uploaderStudentId ?? '').trim() === voterStudentId) {
+      return res.status(403).json({ error: 'cannot_vote_own' })
+    }
+    const map = await readVoteMap()
+    map[voterStudentId] = votedSubmissionId
+    await writeVoteMapAtomic(map)
+    return res.status(204).send()
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'vote_write_failed' })
+  }
+})
+
 app.get('/submissions', async (_req, res) => {
   try {
     const entries = await fs.readdir(DATA_ROOT, { withFileTypes: true })
     const metas = []
+    const validIds = new Set()
     for (const ent of entries) {
       if (!ent.isDirectory()) {
         continue
@@ -68,10 +219,24 @@ app.get('/submissions', async (_req, res) => {
           path.join(DATA_ROOT, ent.name, 'meta.json'),
           'utf8',
         )
-        metas.push(JSON.parse(raw))
+        const m = JSON.parse(raw)
+        metas.push(m)
+        validIds.add(ent.name)
+        if (m.submissionId && typeof m.submissionId === 'string') {
+          validIds.add(m.submissionId.trim())
+        }
       } catch {
         /* 跳过不完整目录 */
       }
+    }
+    const map = await readVoteMap()
+    if (pruneVotesNotInList(map, validIds)) {
+      await writeVoteMapAtomic(map)
+    }
+    const tallies = tallyVotes(map)
+    for (const m of metas) {
+      const id = String(m.submissionId ?? '').trim()
+      m.voteCount = id ? (tallies.get(id) ?? 0) : 0
     }
     metas.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
     res.json(metas)
@@ -139,6 +304,36 @@ app.get('/submissions/:id/media', async (req, res) => {
     res.sendFile(path.resolve(filePath))
   } catch {
     res.status(404).end()
+  }
+})
+
+app.delete('/submissions/:id', async (req, res) => {
+  try {
+    const id = req.params.id
+    if (!UUID_RE.test(id)) {
+      return res.status(400).json({ error: 'invalid_id' })
+    }
+    const uploaderStudentId = String(req.body?.uploaderStudentId ?? '').trim()
+    if (!uploaderStudentId) {
+      return res.status(400).json({ error: 'missing_uploader_student_id' })
+    }
+    const base = path.join(DATA_ROOT, id)
+    let meta
+    try {
+      const raw = await fs.readFile(path.join(base, 'meta.json'), 'utf8')
+      meta = JSON.parse(raw)
+    } catch {
+      return res.status(404).json({ error: 'not_found' })
+    }
+    if (String(meta.uploaderStudentId ?? '').trim() !== uploaderStudentId) {
+      return res.status(403).json({ error: 'forbidden_not_owner' })
+    }
+    await fs.rm(base, { recursive: true, force: true })
+    await removeVotesForSubmission(id)
+    return res.status(204).send()
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'delete_failed' })
   }
 })
 

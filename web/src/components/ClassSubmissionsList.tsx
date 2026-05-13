@@ -4,16 +4,24 @@ import type {
   ClassSubmissionRecord,
   SubmissionMediaKind,
 } from '../types/classSubmission'
-import { listSubmissionsDesc } from '../lib/submissionsDb'
+import {
+  castServerVote,
+  deleteClassSubmission,
+  fetchServerVoteForVoter,
+  listSubmissionsDesc,
+} from '../lib/submissionsDb'
 import {
   persistVote,
   reconcileVoteWithSubmissions,
 } from '../lib/voteStorage'
 import { VoteChangeModal } from './VoteChangeModal'
+import { DeleteSubmissionModal } from './DeleteSubmissionModal'
 
 interface ClassSubmissionsListProps {
   /** 父级递增以触发重新加载 */
   refreshKey: number
+  /** 删除等变更成功后通知父级抬高 `refreshKey` */
+  onListMutated?: () => void
 }
 
 function mediaKindLabel(kind: SubmissionMediaKind): string {
@@ -25,7 +33,11 @@ interface SubmissionRowProps {
   previewUrl: string
   isVoted: boolean
   isOwn: boolean
+  /** 正在提交投票，禁用「投票」防重复 */
+  voteBusy: boolean
   onVote: () => void
+  /** 点击「删除」时调用；仅本人条目会渲染该按钮 */
+  onRequestDelete: () => void
 }
 
 /**
@@ -36,7 +48,9 @@ function SubmissionRow({
   previewUrl,
   isVoted,
   isOwn,
+  voteBusy,
   onVote,
+  onRequestDelete,
 }: SubmissionRowProps) {
   const [mediaFailed, setMediaFailed] = useState(false)
   const cardClass =
@@ -48,6 +62,10 @@ function SubmissionRow({
         <span className="submission-author">{row.uploaderDisplayName}</span>
         <span className="submission-meta">
           {mediaKindLabel(row.mediaKind)} · {row.originalFileName}
+          <span className="submission-vote-count" aria-label={`得票 ${row.voteCount} 票`}>
+            {' '}
+            · {row.voteCount} 票
+          </span>
         </span>
       </header>
       <div className="submission-preview">
@@ -76,13 +94,27 @@ function SubmissionRow({
       </div>
       <footer className="submission-vote-row">
         {isOwn ? (
-          <span className="vote-own-label">本人作品，不参与投票</span>
+          <div className="submission-own-row">
+            <span className="vote-own-label">本人作品，不参与投票</span>
+            <button
+              type="button"
+              className="submission-delete-btn"
+              onClick={onRequestDelete}
+            >
+              删除作品
+            </button>
+          </div>
         ) : isVoted ? (
           <span className="vote-badge" aria-current="true">
             已投票
           </span>
         ) : (
-          <button type="button" className="vote-button" onClick={onVote}>
+          <button
+            type="button"
+            className="vote-button"
+            disabled={voteBusy}
+            onClick={onVote}
+          >
             投票
           </button>
         )}
@@ -94,7 +126,10 @@ function SubmissionRow({
 /**
  * 班级作品列表：新在前、作者信息、预览、投票与改投确认。
  */
-export function ClassSubmissionsList({ refreshKey }: ClassSubmissionsListProps) {
+export function ClassSubmissionsList({
+  refreshKey,
+  onListMutated,
+}: ClassSubmissionsListProps) {
   const { user } = useAuth()
   const [items, setItems] = useState<
     { row: ClassSubmissionRecord; url: string }[]
@@ -104,6 +139,12 @@ export function ClassSubmissionsList({ refreshKey }: ClassSubmissionsListProps) 
   const [activeVoteId, setActiveVoteId] = useState<string | null>(null)
   const [changeVoteTarget, setChangeVoteTarget] =
     useState<ClassSubmissionRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] =
+    useState<ClassSubmissionRecord | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [deleteActionError, setDeleteActionError] = useState<string | null>(null)
+  const [voteActionError, setVoteActionError] = useState<string | null>(null)
+  const [voteSubmitting, setVoteSubmitting] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -121,6 +162,14 @@ export function ClassSubmissionsList({ refreshKey }: ClassSubmissionsListProps) 
         const ids = new Set(rows.map((r) => r.submissionId))
         let nextActive: string | null = null
         if (user != null) {
+          try {
+            const srv = await fetchServerVoteForVoter(user.studentId)
+            if (srv != null && ids.has(srv)) {
+              persistVote(user.studentId, srv)
+            }
+          } catch {
+            /* 无法拉取服务端选票时仍以本地为准 */
+          }
           nextActive = reconcileVoteWithSubmissions(ids, user.studentId)
         }
         const next = rows.map((row) => {
@@ -168,25 +217,88 @@ export function ClassSubmissionsList({ refreshKey }: ClassSubmissionsListProps) 
     if (activeVoteId === row.submissionId) {
       return
     }
+    if (voteSubmitting) {
+      return
+    }
     if (activeVoteId == null) {
-      persistVote(user.studentId, row.submissionId)
-      setActiveVoteId(row.submissionId)
+      setVoteActionError(null)
+      void (async () => {
+        setVoteSubmitting(true)
+        try {
+          await castServerVote(user.studentId, row.submissionId)
+          persistVote(user.studentId, row.submissionId)
+          setActiveVoteId(row.submissionId)
+          onListMutated?.()
+        } catch (e) {
+          setVoteActionError(
+            e instanceof Error ? e.message : '投票失败，请稍后重试。',
+          )
+        } finally {
+          setVoteSubmitting(false)
+        }
+      })()
       return
     }
     setChangeVoteTarget(row)
   }
 
   function handleConfirmChangeVote() {
-    if (user == null || changeVoteTarget == null) {
+    if (user == null || changeVoteTarget == null || voteSubmitting) {
       return
     }
-    persistVote(user.studentId, changeVoteTarget.submissionId)
-    setActiveVoteId(changeVoteTarget.submissionId)
-    setChangeVoteTarget(null)
+    setVoteActionError(null)
+    void (async () => {
+      setVoteSubmitting(true)
+      try {
+        await castServerVote(user.studentId, changeVoteTarget.submissionId)
+        persistVote(user.studentId, changeVoteTarget.submissionId)
+        setActiveVoteId(changeVoteTarget.submissionId)
+        setChangeVoteTarget(null)
+        onListMutated?.()
+      } catch (e) {
+        setVoteActionError(
+          e instanceof Error ? e.message : '改投失败，请稍后重试。',
+        )
+      } finally {
+        setVoteSubmitting(false)
+      }
+    })()
   }
 
   function handleCancelChangeVote() {
     setChangeVoteTarget(null)
+  }
+
+  function handleOpenDelete(row: ClassSubmissionRecord) {
+    setDeleteActionError(null)
+    setDeleteTarget(row)
+  }
+
+  function handleCancelDelete() {
+    if (deleteSubmitting) {
+      return
+    }
+    setDeleteTarget(null)
+    setDeleteActionError(null)
+  }
+
+  async function handleConfirmDelete() {
+    if (user == null || deleteTarget == null) {
+      return
+    }
+    setDeleteSubmitting(true)
+    setDeleteActionError(null)
+    try {
+      await deleteClassSubmission(deleteTarget.submissionId, user.studentId)
+      setDeleteTarget(null)
+      onListMutated?.()
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : '删除失败，请稍后重试。'
+      setDeleteActionError(msg)
+    } finally {
+      setDeleteSubmitting(false)
+    }
   }
 
   if (loading) {
@@ -214,22 +326,47 @@ export function ClassSubmissionsList({ refreshKey }: ClassSubmissionsListProps) 
       {changeVoteTarget != null ? (
         <VoteChangeModal
           target={changeVoteTarget}
+          submitting={voteSubmitting}
           onCancel={handleCancelChangeVote}
           onConfirm={handleConfirmChangeVote}
         />
       ) : null}
+      {deleteTarget != null ? (
+        <DeleteSubmissionModal
+          target={deleteTarget}
+          submitting={deleteSubmitting}
+          onCancel={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+        />
+      ) : null}
+      {deleteActionError != null ? (
+        <div className="panel-error submission-delete-banner" role="alert">
+          {deleteActionError}
+        </div>
+      ) : null}
+      {voteActionError != null ? (
+        <div className="panel-error submission-delete-banner" role="alert">
+          {voteActionError}
+        </div>
+      ) : null}
       <ul className="submission-list">
-        {items.map(({ row, url }) => (
-          <li key={row.submissionId}>
-            <SubmissionRow
-              row={row}
-              previewUrl={url}
-              isVoted={activeVoteId === row.submissionId}
-              isOwn={user != null && row.uploaderStudentId === user.studentId}
-              onVote={() => handleVoteClick(row)}
-            />
-          </li>
-        ))}
+        {items.map(({ row, url }) => {
+          const isOwnRow =
+            user != null && row.uploaderStudentId === user.studentId
+          return (
+            <li key={row.submissionId}>
+              <SubmissionRow
+                row={row}
+                previewUrl={url}
+                isVoted={activeVoteId === row.submissionId}
+                isOwn={isOwnRow}
+                voteBusy={voteSubmitting}
+                onVote={() => handleVoteClick(row)}
+                onRequestDelete={() => handleOpenDelete(row)}
+              />
+            </li>
+          )
+        })}
       </ul>
     </>
   )

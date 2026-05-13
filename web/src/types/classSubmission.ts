@@ -27,4 +27,6 @@ export interface ClassSubmissionRecord {
   blob?: Blob
   /** 同源媒体地址（服务端列表） */
   mediaUrl?: string
+  /** 服务端聚合后的得票数（非负整数） */
+  voteCount: number
 }

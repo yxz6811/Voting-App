@@ -251,6 +251,12 @@
   color: var(--text);
 }
 
+.submission-vote-count {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
 .submission-preview {
   border-radius: 8px;
   overflow: hidden;
@@ -310,6 +316,67 @@
 .vote-own-label {
   font-size: 0.88rem;
   color: var(--text);
+}
+
+.submission-own-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.submission-own-row .vote-own-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.submission-delete-btn {
+  font: inherit;
+  cursor: pointer;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #c45c5c;
+  background: transparent;
+  color: #a33;
+  font-size: 0.85rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.submission-delete-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.submission-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.submission-delete-confirm {
+  margin-top: 0.25rem;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #a33;
+  background: #c45c5c;
+  color: #fff;
+  font-weight: 500;
+}
+
+.submission-delete-confirm:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.submission-delete-confirm:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.submission-delete-banner {
+  margin-bottom: 0.85rem;
 }
 
 .vote-modal-overlay {
