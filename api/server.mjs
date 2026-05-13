@@ -1,6 +1,6 @@
 /**
  * 班级作品集中存储 API：磁盘目录 + meta.json，供所有浏览器/账号共享列表。
- * 投票：`votes.json` 存 `voterStudentId → votedSubmissionId[]`（每人最多 10 票，不重复），原子写入。
+ * 投票：`votes.json` 存 `voterStudentId → votedSubmissionId[]`（每人最多 10 票，不重复），原子写入；读写投票接口须携带 `voterDisplayName` 并与允许名单一致。
  *
  * 环境变量：
  * - `VOTING_DATA_DIR`：数据根目录（默认 `./data`）
@@ -18,6 +18,77 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_ROOT = process.env.VOTING_DATA_DIR || path.join(__dirname, 'data')
 const PORT = Number(process.env.PORT || 3040)
 const MAX_BYTES = 170 * 1024 * 1024
+
+/**
+ * 与 `number.md`、`web/src/lib/loginRoster.ts` 同步的登录白名单（内联于此，避免线上只拷贝 `server.mjs` 时缺模块导致 API 无法启动）。
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+const LOGIN_ROSTER_BY_STUDENT_ID = Object.freeze({
+  '1': '蔡雨何',
+  '2': '曾昱棋',
+  '3': '陈筱萱',
+  '4': '方俊楠',
+  '5': '封依',
+  '6': '何亚楠',
+  '7': '何裕翔',
+  '8': '洪晨钦',
+  '9': '金禹枭',
+  '10': '金智炫',
+  '11': '李安',
+  '12': '李逸豪',
+  '13': '刘嘉乐',
+  '14': '陆佳涛',
+  '15': '陆艺桐',
+  '16': '洛辰娜',
+  '17': '马铭阳',
+  '18': '毛高默',
+  '19': '倪嘉言',
+  '20': '彭懿',
+  '21': '沈旭东',
+  '22': '孙浩淙',
+  '23': '孙婧',
+  '24': '孙俊哲',
+  '25': '孙绮璐',
+  '26': '孙晓楠',
+  '27': '汤铭宇',
+  '28': '唐子成',
+  '29': '汪芷奕',
+  '30': '吴一涵',
+  '31': '吴逸天',
+  '32': '谢睿泽',
+  '33': '徐朗宁',
+  '34': '徐史晨鹤',
+  '35': '徐依雯',
+  '36': '许佳燊',
+  '37': '许鋆涵',
+  '39': '杨蒣乐',
+  '40': '余晨义',
+  '41': '俞美伦',
+  '42': '俞雨灵',
+  '43': '张博豪',
+  '44': '张之钰',
+  '45': '张之珏',
+  '46': '章程好',
+  '47': '章一琳',
+  '48': '赵一涵',
+  '49': '朱婧妤',
+  '50': '朱奕辰',
+  '6811': 'yxz',
+  '708': 'teacher',
+})
+
+/**
+ * @param {string} studentId
+ * @param {string} displayName
+ * @returns {boolean}
+ */
+function isAllowedLoginPair(studentId, displayName) {
+  const sid = String(studentId ?? '').trim()
+  const name = String(displayName ?? '').trim()
+  const expected = LOGIN_ROSTER_BY_STUDENT_ID[sid]
+  return expected != null && expected === name
+}
 
 /** 仅允许 UUID 目录名，防止路径穿越 */
 const UUID_RE =
@@ -219,8 +290,15 @@ app.get('/health', (_req, res) => {
 app.get('/votes/by-voter', async (req, res) => {
   try {
     const voterStudentId = String(req.query.voterStudentId ?? '').trim()
+    const voterDisplayName = String(req.query.voterDisplayName ?? '').trim()
     if (!voterStudentId) {
       return res.status(400).json({ error: 'missing_voter' })
+    }
+    if (!voterDisplayName) {
+      return res.status(400).json({ error: 'missing_voter_display_name' })
+    }
+    if (!isAllowedLoginPair(voterStudentId, voterDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
     }
     const map = await readVoteMap()
     let list = map[voterStudentId] ?? []
@@ -251,9 +329,16 @@ app.get('/votes/by-voter', async (req, res) => {
 app.put('/votes', async (req, res) => {
   try {
     const voterStudentId = String(req.body?.voterStudentId ?? '').trim()
+    const voterDisplayName = String(req.body?.voterDisplayName ?? '').trim()
     const votedSubmissionId = String(req.body?.votedSubmissionId ?? '').trim()
     if (!voterStudentId || !votedSubmissionId) {
       return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!voterDisplayName) {
+      return res.status(400).json({ error: 'missing_voter_display_name' })
+    }
+    if (!isAllowedLoginPair(voterStudentId, voterDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
     }
     if (!UUID_RE.test(votedSubmissionId)) {
       return res.status(400).json({ error: 'invalid_submission_id' })
@@ -264,9 +349,6 @@ app.put('/votes', async (req, res) => {
       meta = JSON.parse(await fs.readFile(path.join(base, 'meta.json'), 'utf8'))
     } catch {
       return res.status(404).json({ error: 'submission_not_found' })
-    }
-    if (String(meta.uploaderStudentId ?? '').trim() === voterStudentId) {
-      return res.status(403).json({ error: 'cannot_vote_own' })
     }
     const map = await readVoteMap()
     const cur = Array.isArray(map[voterStudentId])
@@ -291,9 +373,16 @@ app.put('/votes', async (req, res) => {
 app.delete('/votes', async (req, res) => {
   try {
     const voterStudentId = String(req.body?.voterStudentId ?? '').trim()
+    const voterDisplayName = String(req.body?.voterDisplayName ?? '').trim()
     const votedSubmissionId = String(req.body?.votedSubmissionId ?? '').trim()
     if (!voterStudentId || !votedSubmissionId) {
       return res.status(400).json({ error: 'missing_fields' })
+    }
+    if (!voterDisplayName) {
+      return res.status(400).json({ error: 'missing_voter_display_name' })
+    }
+    if (!isAllowedLoginPair(voterStudentId, voterDisplayName)) {
+      return res.status(403).json({ error: 'voter_not_allowed' })
     }
     if (!UUID_RE.test(votedSubmissionId)) {
       return res.status(400).json({ error: 'invalid_submission_id' })

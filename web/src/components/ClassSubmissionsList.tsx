@@ -26,6 +26,8 @@ export interface ClassSubmissionsListProps {
   refreshKey: number
   /** 删除等变更成功后通知父级抬高 `refreshKey` */
   onListMutated?: () => void
+  /** 进入独立预览页 */
+  onOpenPreview: (submissionId: string) => void
   /** 父级 `listSubmissionsDesc` 结果 */
   submissions: ClassSubmissionRecord[]
   submissionsLoading: boolean
@@ -63,7 +65,6 @@ function submissionTierByVotes(voteCount: number, maxVoteCount: number): Submiss
 
 interface SubmissionRowProps {
   row: ClassSubmissionRecord
-  previewUrl: string
   isVoted: boolean
   isOwn: boolean
   tier: SubmissionTier
@@ -74,16 +75,19 @@ interface SubmissionRowProps {
   onVote: () => void
   /** 取消对该作品的投票 */
   onCancelVote: () => void
+  /** 打开独立预览页 */
+  onPreview: () => void
   /** 点击「删除」时调用；仅管理员会渲染该按钮 */
   onRequestDelete: () => void
 }
 
 /**
- * 单条作品：元数据 + 预览 + 投票区。
+ * 单条作品：元数据、预览入口、与「预览」同行的投票区（含本人作品，仍受每人十票上限约束）。
+ *
+ * @param props - 行展示与交互
  */
 function SubmissionRow({
   row,
-  previewUrl,
   isVoted,
   isOwn,
   tier,
@@ -91,13 +95,15 @@ function SubmissionRow({
   voteBusy,
   onVote,
   onCancelVote,
+  onPreview,
   onRequestDelete,
 }: SubmissionRowProps) {
-  const [mediaFailed, setMediaFailed] = useState(false)
   const cardClass =
     'submission-card' + (isVoted ? ' submission-card--voted' : '')
   const titleShown = submissionDisplayLabel(row)
   const authorShown = submissionAuthorDisplayName(row)
+  const canPreview =
+    (row.mediaUrl != null && row.mediaUrl !== '') || row.blob != null
 
   return (
     <article className={cardClass}>
@@ -119,88 +125,64 @@ function SubmissionRow({
           </span>
         </span>
       </header>
-      <div className="submission-preview">
-        {mediaFailed ? (
-          <div className="submission-preview-error" role="alert">
-            {row.mediaKind === 'video'
-              ? '无法播放此视频，可尝试使用 H.264 + AAC 编码的 MP4。'
-              : '无法显示此图片，文件可能已损坏。'}
-          </div>
-        ) : row.mediaKind === 'image' ? (
-          <img
-            src={previewUrl}
-            alt={titleShown}
-            loading="lazy"
-            onError={() => setMediaFailed(true)}
-          />
-        ) : (
-          <video
-            src={previewUrl}
-            controls
-            muted
-            playsInline
-            onError={() => setMediaFailed(true)}
-          />
-        )}
+      <div className="submission-action-row">
+        <div className="submission-action-row__left">
+          <button
+            type="button"
+            className="ux-action-btn ux-action-btn--primary"
+            disabled={!canPreview}
+            onClick={onPreview}
+          >
+            预览
+          </button>
+          {!canPreview ? (
+            <span className="submission-preview-unavailable">暂无可预览媒体</span>
+          ) : null}
+        </div>
+        <div className="submission-action-row__right">
+          {isVoted ? (
+            <>
+              <span className="vote-badge" aria-current="true">
+                已投票
+              </span>
+              <button
+                type="button"
+                className="vote-cancel-btn"
+                disabled={voteBusy}
+                onClick={onCancelVote}
+              >
+                取消
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="vote-button"
+              disabled={voteBusy}
+              onClick={onVote}
+            >
+              投票
+            </button>
+          )}
+        </div>
       </div>
       <footer className="submission-vote-row">
-        {isOwn ? (
-          <div className="submission-own-row">
-            <span className="vote-own-label">本人作品，不参与投票</span>
-            {showAdminDelete ? (
-              <button
-                type="button"
-                className="submission-delete-btn"
-                onClick={onRequestDelete}
-              >
-                删除作品
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <>
-            <div className="submission-vote-actions">
-              {isVoted ? (
-                <>
-                  <span className="vote-badge" aria-current="true">
-                    已投票
-                  </span>
-                  <button
-                    type="button"
-                    className="vote-cancel-btn"
-                    disabled={voteBusy}
-                    onClick={onCancelVote}
-                  >
-                    取消
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="vote-button"
-                  disabled={voteBusy}
-                  onClick={onVote}
-                >
-                  投票
-                </button>
-              )}
-            </div>
-            <p className="submission-ux-tip">
-              {isVoted
-                ? '已支持该作品，可在排行榜关注名次变化。'
-                : '喜欢就投一票，票数会实时计入排行榜。'}
-            </p>
-            {showAdminDelete ? (
-              <button
-                type="button"
-                className="submission-delete-btn submission-delete-btn--admin-row"
-                onClick={onRequestDelete}
-              >
-                删除作品
-              </button>
-            ) : null}
-          </>
-        )}
+        <p className="submission-ux-tip">
+          {isVoted
+            ? '已支持该作品，可在排行榜关注名次变化。'
+            : isOwn
+              ? '也可为自己的作品投票，仍计入每人十票上限。'
+              : '喜欢就投一票，票数会实时计入排行榜。'}
+        </p>
+        {showAdminDelete ? (
+          <button
+            type="button"
+            className="submission-delete-btn submission-delete-btn--admin-row"
+            onClick={onRequestDelete}
+          >
+            删除作品
+          </button>
+        ) : null}
       </footer>
     </article>
   )
@@ -214,15 +196,14 @@ function SubmissionRow({
 export function ClassSubmissionsList({
   refreshKey,
   onListMutated,
+  onOpenPreview,
   submissions,
   submissionsLoading,
   submissionsError,
 }: ClassSubmissionsListProps) {
   const { user } = useAuth()
   const showAdminDelete = isClassSubmissionAdmin(user)
-  const [items, setItems] = useState<
-    { row: ClassSubmissionRecord; url: string }[]
-  >([])
+  const [items, setItems] = useState<ClassSubmissionRecord[]>([])
   const [votedSubmissionIds, setVotedSubmissionIds] = useState<string[]>([])
   const [voteLimitOpen, setVoteLimitOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] =
@@ -242,7 +223,6 @@ export function ClassSubmissionsList({
       return
     }
     let alive = true
-    const revokeList: string[] = []
 
     ;(async () => {
       const rows = submissions
@@ -250,7 +230,10 @@ export function ClassSubmissionsList({
       let nextIds: string[] = []
       if (user != null) {
         try {
-          const srv = await fetchServerVotesForVoter(user.studentId)
+          const srv = await fetchServerVotesForVoter(
+            user.studentId,
+            user.displayName,
+          )
           const filtered = srv.filter((id) => ids.has(id))
           persistVotes(user.studentId, filtered)
           nextIds = filtered
@@ -258,46 +241,27 @@ export function ClassSubmissionsList({
           nextIds = reconcileVotesWithSubmissions(ids, user.studentId)
         }
       }
-      const next = rows.map((row) => {
-        if (row.mediaUrl != null && row.mediaUrl !== '') {
-          return { row, url: row.mediaUrl }
-        }
-        if (row.blob != null) {
-          const url = URL.createObjectURL(row.blob)
-          revokeList.push(url)
-          return { row, url }
-        }
-        return { row, url: '' }
-      })
       if (!alive) {
-        for (const u of revokeList) {
-          URL.revokeObjectURL(u)
-        }
         return
       }
-      setItems(next)
+      setItems(rows)
       setVotedSubmissionIds(nextIds)
     })()
 
     return () => {
       alive = false
-      for (const u of revokeList) {
-        URL.revokeObjectURL(u)
-      }
     }
   }, [
     submissions,
     submissionsLoading,
     submissionsError,
     user?.studentId,
+    user?.displayName,
     refreshKey,
   ])
 
   function handleVoteClick(row: ClassSubmissionRecord) {
     if (user == null) {
-      return
-    }
-    if (row.uploaderStudentId === user.studentId) {
       return
     }
     if (votedSubmissionIds.includes(row.submissionId)) {
@@ -314,7 +278,7 @@ export function ClassSubmissionsList({
     void (async () => {
       setVoteSubmitting(true)
       try {
-        await castServerVote(user.studentId, row.submissionId)
+        await castServerVote(user.studentId, user.displayName, row.submissionId)
         const next = [...votedSubmissionIds, row.submissionId]
         persistVotes(user.studentId, next)
         setVotedSubmissionIds(next)
@@ -348,7 +312,7 @@ export function ClassSubmissionsList({
     void (async () => {
       setVoteSubmitting(true)
       try {
-        await withdrawServerVote(user.studentId, row.submissionId)
+        await withdrawServerVote(user.studentId, user.displayName, row.submissionId)
         const next = votedSubmissionIds.filter((id) => id !== row.submissionId)
         persistVotes(user.studentId, next)
         setVotedSubmissionIds(next)
@@ -444,14 +408,13 @@ export function ClassSubmissionsList({
         你还可以投 <strong>{remainingVotes}</strong> / {VOTES_PER_USER} 票
       </p>
       <ul className="submission-list">
-        {items.map(({ row, url }) => {
+        {items.map((row) => {
           const isOwnRow =
             user != null && row.uploaderStudentId === user.studentId
           return (
             <li key={row.submissionId}>
               <SubmissionRow
                 row={row}
-                previewUrl={url}
                 isVoted={votedSubmissionIds.includes(row.submissionId)}
                 isOwn={isOwnRow}
                 tier={submissionTierByVotes(row.voteCount, maxVoteCount)}
@@ -459,6 +422,7 @@ export function ClassSubmissionsList({
                 voteBusy={voteSubmitting}
                 onVote={() => handleVoteClick(row)}
                 onCancelVote={() => handleCancelVote(row)}
+                onPreview={() => onOpenPreview(row.submissionId)}
                 onRequestDelete={() => handleOpenDelete(row)}
               />
             </li>

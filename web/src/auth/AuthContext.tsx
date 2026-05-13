@@ -14,6 +14,7 @@ import {
   writeStoredUser,
 } from '../lib/userStorage'
 import { validateDisplayName, validateStudentId } from '../lib/validateUser'
+import { isAllowedLoginPair } from '../lib/loginRoster'
 
 export interface AuthContextValue {
   /** 是否已完成从 localStorage 的首次恢复（避免登录页闪烁） */
@@ -23,7 +24,7 @@ export interface AuthContextValue {
   /**
    * 尝试登录：校验通过后写入存储并更新状态。
    *
-   * @param displayName 姓名
+   * @param displayName 姓名（须与本班 `number.md` 名单完全一致）
    * @param studentId 学号
    * @returns 失败时返回错误信息（可展示在表单顶部）
    */
@@ -64,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const next: CurrentUser = {
       displayName: nameRes.value,
       studentId: idRes.value,
+    }
+    if (!isAllowedLoginPair(next.studentId, next.displayName)) {
+      return '姓名与学号须与本班允许名单完全一致，请核对后重试。'
     }
     writeStoredUser(next)
     setUser(next)

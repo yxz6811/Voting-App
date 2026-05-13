@@ -55,15 +55,20 @@ export async function listSubmissionsDesc(): Promise<ClassSubmissionRecord[]> {
 
 /**
  * 读取服务端当前学号已投的作品 ID 列表（去重、有序无关）。
+ * 须同时传姓名，服务端按白名单校验，防止伪造学号刷票。
  *
  * @param voterStudentId 投票者学号
+ * @param voterDisplayName 投票者姓名（须与名单一致）
  * @throws {Error} HTTP 非 2xx 或网络失败
  */
 export async function fetchServerVotesForVoter(
   voterStudentId: string,
+  voterDisplayName: string,
 ): Promise<string[]> {
   const base = getSubmissionsApiBase()
-  const url = `${base}/votes/by-voter?voterStudentId=${encodeURIComponent(voterStudentId)}`
+  const url =
+    `${base}/votes/by-voter?voterStudentId=${encodeURIComponent(voterStudentId)}` +
+    `&voterDisplayName=${encodeURIComponent(voterDisplayName)}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`vote_read_failed:${res.status}`)
@@ -89,11 +94,13 @@ export async function fetchServerVotesForVoter(
  * 向服务端追加一票（同一作品不重复计数；满 10 票时服务端拒绝）。
  *
  * @param voterStudentId 投票者学号
+ * @param voterDisplayName 投票者姓名（须与名单一致）
  * @param votedSubmissionId 被投作品 ID
  * @throws {Error} 校验失败、网络错误等，见 `message`
  */
 export async function castServerVote(
   voterStudentId: string,
+  voterDisplayName: string,
   votedSubmissionId: string,
 ): Promise<void> {
   const base = getSubmissionsApiBase()
@@ -102,7 +109,11 @@ export async function castServerVote(
     res = await fetch(`${base}/votes`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ voterStudentId, votedSubmissionId }),
+      body: JSON.stringify({
+        voterStudentId,
+        voterDisplayName,
+        votedSubmissionId,
+      }),
     })
   } catch (e) {
     const err = new Error('网络异常，无法提交投票。')
@@ -136,6 +147,12 @@ export async function castServerVote(
  * @param errorCode 服务端 `error` 字段
  */
 function mapCastVoteMessage(status: number, errorCode: string): string {
+  if (errorCode === 'voter_not_allowed') {
+    return '当前账号不在允许投票名单内，请重新登录。'
+  }
+  if (errorCode === 'missing_voter_display_name') {
+    return '投票请求不完整，请刷新页面后重试。'
+  }
   if (errorCode === 'cannot_vote_own') {
     return '不能给自己的作品投票。'
   }
@@ -158,11 +175,13 @@ function mapCastVoteMessage(status: number, errorCode: string): string {
  * 取消对某一作品的投票（服务端从该用户的已投列表中移除）。
  *
  * @param voterStudentId 投票者学号
+ * @param voterDisplayName 投票者姓名（须与名单一致）
  * @param votedSubmissionId 要取消的作品 ID
  * @throws {Error} 非 2xx 或网络失败
  */
 export async function withdrawServerVote(
   voterStudentId: string,
+  voterDisplayName: string,
   votedSubmissionId: string,
 ): Promise<void> {
   const base = getSubmissionsApiBase()
@@ -171,7 +190,11 @@ export async function withdrawServerVote(
     res = await fetch(`${base}/votes`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ voterStudentId, votedSubmissionId }),
+      body: JSON.stringify({
+        voterStudentId,
+        voterDisplayName,
+        votedSubmissionId,
+      }),
     })
   } catch (e) {
     const err = new Error('网络异常，无法取消投票。')
@@ -205,6 +228,12 @@ export async function withdrawServerVote(
  * @param errorCode 服务端 `error` 字段
  */
 function mapWithdrawVoteMessage(status: number, errorCode: string): string {
+  if (errorCode === 'voter_not_allowed') {
+    return '当前账号不在允许投票名单内，请重新登录。'
+  }
+  if (errorCode === 'missing_voter_display_name') {
+    return '取消投票请求不完整，请刷新页面后重试。'
+  }
   if (errorCode === 'vote_not_found') {
     return '当前未投票给该作品，无需取消。'
   }

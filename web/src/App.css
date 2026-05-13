@@ -545,6 +545,154 @@
   font-size: 0.9rem;
 }
 
+.submission-action-row {
+  margin-top: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.submission-action-row__left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.submission-action-row__right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.submission-preview-unavailable {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/**
+ * 强调操作按钮：悬停上浮、阴影；点击微缩。
+ */
+.ux-action-btn {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.48rem 1.2rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    filter 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.ux-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ux-action-btn--primary {
+  background: var(--accent-bg);
+  color: var(--text-h);
+  border-color: var(--accent-border);
+  box-shadow: 0 2px 12px rgba(218, 140, 77, 0.28);
+}
+
+.ux-action-btn--primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(218, 140, 77, 0.38);
+  filter: brightness(1.04);
+}
+
+.ux-action-btn--primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(218, 140, 77, 0.22);
+}
+
+.ux-action-btn--ghost {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: var(--border-strong);
+  color: var(--heading);
+}
+
+.ux-action-btn--ghost:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(210, 129, 78, 0.55);
+  box-shadow: 0 8px 22px rgba(90, 70, 50, 0.12);
+}
+
+.ux-action-btn--ghost:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.submission-preview-page {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.submission-preview-page-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.submission-preview-page-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.submission-preview-page-title {
+  margin: 0;
+  font-size: 1.12rem;
+  color: var(--heading);
+}
+
+.submission-preview-page-sub {
+  margin: 0.28rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.submission-preview-page-card {
+  padding: clamp(0.85rem, 2vw, 1.15rem);
+}
+
+.submission-preview-page-media {
+  display: block;
+  width: 100%;
+  max-height: min(78vh, 680px);
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  background: rgba(247, 236, 220, 0.45);
+  border: 1px solid var(--border);
+}
+
+.submission-preview-page-footer {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.submission-preview-missing {
+  padding: 1.5rem;
+  text-align: center;
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+}
+
 .submission-card--voted {
   border-color: rgba(210, 129, 78, 0.65);
   box-shadow:
@@ -560,12 +708,6 @@
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-.submission-vote-actions {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
 }
 
 .submission-ux-tip {
