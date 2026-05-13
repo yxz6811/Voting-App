@@ -107,24 +107,39 @@ export function LoggedInClassroom() {
           </div>
         </div>
       </section>
-      {isAdmin ? (
-        <nav className="classroom-nav" aria-label="班级功能">
+      <div className="classroom-toolbar">
+        <div className="classroom-toolbar__left">
+          {isAdmin ? (
+            <nav className="classroom-nav" aria-label="班级功能">
+              <button
+                type="button"
+                className={tab === 'upload' ? 'tab active' : 'tab'}
+                onClick={() => setTab('upload')}
+              >
+                上传作品
+              </button>
+              <button
+                type="button"
+                className={tab === 'list' ? 'tab active' : 'tab'}
+                onClick={goListTab}
+              >
+                班级列表
+              </button>
+            </nav>
+          ) : null}
+        </div>
+        <div className="classroom-toolbar__right">
           <button
             type="button"
-            className={tab === 'upload' ? 'tab active' : 'tab'}
-            onClick={() => setTab('upload')}
+            className="classroom-feedback-btn"
+            onClick={() => {
+              window.location.hash = '#/feedback'
+            }}
           >
-            上传作品
+            反馈问题
           </button>
-          <button
-            type="button"
-            className={tab === 'list' ? 'tab active' : 'tab'}
-            onClick={goListTab}
-          >
-            班级列表
-          </button>
-        </nav>
-      ) : null}
+        </div>
+      </div>
       <section className="classroom-body" aria-live="polite">
         {tab === 'upload' ? (
           <div className="classroom-pane classroom-pane--upload">

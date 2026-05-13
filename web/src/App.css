@@ -391,6 +391,123 @@
   font-weight: 600;
 }
 
+.classroom-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.classroom-toolbar__left {
+  flex: 1;
+  min-width: 0;
+}
+
+.classroom-toolbar__right {
+  flex-shrink: 0;
+}
+
+.classroom-feedback-btn {
+  font: inherit;
+  cursor: pointer;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 104, 72, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--heading);
+  font-weight: 600;
+  transition: all 160ms ease;
+}
+
+.classroom-feedback-btn:hover {
+  border-color: rgba(166, 106, 66, 0.5);
+  background: rgba(255, 252, 246, 0.95);
+}
+
+.feedback-page {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.feedback-page__card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(171, 108, 69, 0.22);
+  box-shadow: var(--shadow-sm);
+}
+
+.feedback-page__head .classroom-title {
+  margin-top: 0.15rem;
+}
+
+.feedback-page__intro {
+  margin: 0.4rem 0 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.feedback-page__identity {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.feedback-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.feedback-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.feedback-page__field textarea,
+.feedback-page__field input {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text);
+}
+
+.feedback-page__field textarea {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+.feedback-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
+}
+
+.feedback-page__error {
+  margin: 0;
+}
+
+.feedback-page__success {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(64, 111, 88, 0.35);
+  background: rgba(64, 111, 88, 0.1);
+  color: var(--heading);
+}
+
+.feedback-page__success p {
+  margin: 0 0 0.75rem;
+}
+
 .classroom-body {
   min-height: 12rem;
 }
